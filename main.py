@@ -57,7 +57,35 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = await get_user_data(update, context)
     db.update({'points': user_data.get('points', 0) + 1}, User.id == user_id)
 
-    # --- أوامر البنك ---
+    # --- أمر "العاب" لعرض القائمة كاملة ---
+    if text in ["العاب", "ألعاب", "قائمة الالعاب"]:
+        games_menu = (
+            "🎮 **قائمة ألعاب مونوبولي العظيم** 🎮\n\n"
+            "💰 **ألعاب البنك:**\n"
+            "← `رصيدي`: لمعرفة مالك ونقاطك.\n"
+            "← `راتب`: استلام راتبك الدوري.\n"
+            "← `كنز`: البحث عن كنز مفقود.\n"
+            "← `زرف`: سرقة رصيد من عضو آخر.\n"
+            "← `حظ`: جرب حظك (ربح أو خسارة).\n\n"
+            "🎲 **ألعاب التفاعل:**\n"
+            "← `صورة`: تحدي معرفة الصورة (يربح 10 مليون).\n"
+            "← `روليت`: مسابقة القرعة الكبرى (للمدراء).\n"
+            "← `ملك التفاعل`: تتويج بطل الأسبوع (للمدراء).\n\n"
+            "⚙️ **التحكم:**\n"
+            "← `فتح`: لتشغيل الألعاب في القروب.\n"
+            "← `قفل`: لإيقاف الألعاب."
+        )
+        await update.message.reply_text(games_menu, parse_mode="Markdown")
+        return
+
+    # --- أوامر التحكم ---
+    if text in ["فتح", "فتح الالعاب"]:
+        if is_owner or is_admin:
+            context.chat_data['games_active'] = True
+            await update.message.reply_text("✅ تم فتح الألعاب بنجاح!")
+        return
+
+    # --- أوامر البنك والخدمات ---
     if text == "رصيدي":
         await update.message.reply_text(f"👤 {user_name}\n💰 رصيدك: {user_data['balance']:,} ريال\n⭐ نقاطك: {user_data.get('points', 0)}")
     
@@ -87,26 +115,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else: await update.message.reply_text("❌ لا يوجد ضحية غني حالياً")
         else: await update.message.reply_text("⏳ الزرف كل 10 دقائق")
 
-    elif text == "حظ":
-        if current_time - user_data.get('last_luck', 0) > 300:
-            if random.random() > 0.5:
-                amt = random.randint(5000000, 100000000)
-                db.update({'balance': user_data['balance'] + amt, 'last_luck': current_time}, User.id == user_id)
-                await update.message.reply_text(f"🍀 حظك حلو! كسبت {amt:,} ريال")
-            else:
-                amt = random.randint(5000000, 50000000)
-                db.update({'balance': max(0, user_data['balance'] - amt), 'last_luck': current_time}, User.id == user_id)
-                await update.message.reply_text(f"💀 حظك سيء.. خسرت {amt:,} ريال")
-        else: await update.message.reply_text("⏳ جرب حظك كل 5 دقائق")
-
-    elif text.startswith("هدية") and is_owner:
-        try:
-            gift_amt = int(text.split()[1])
-            for u in db.all(): db.update({'balance': u['balance'] + gift_amt}, User.id == u['id'])
-            await update.message.reply_text(f"🎁 المالك وزع هدية {gift_amt:,} للجميع!")
-        except: pass
-
-    # --- مسابقة ملك التفاعل (الرسالة الأصلية كما طلبتها) ---
+    # --- رسالة ملك التفاعل الملكية (المحدثة) ---
     elif text == "ملك التفاعل" and (is_owner or is_admin):
         all_u = db.all()
         if all_u:
@@ -122,7 +131,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(msg)
                 for u in all_u: db.update({'points': 0}, User.id == u['id'])
 
-    # --- لعبة الروليت (الرسائل الأصلية الملكية) ---
+    # --- لعبة الروليت (الرسائل الأصلية) ---
     elif text == "روليت":
         if is_owner or is_admin:
             context.chat_data['r_on'] = True
@@ -149,12 +158,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(win_msg)
             context.chat_data['r_on'] = False
 
-    # --- لعبة الصور (إصلاح شامل للاستجابة) ---
-    elif text == "فتح":
-        if is_owner or is_admin:
-            context.chat_data['games_active'] = True
-            await update.message.reply_text("✅ تم فتح الألعاب")
-
+    # --- لعبة الصور ---
     elif text in ["صورة", "الصورة", "صوره"]:
         if context.chat_data.get('games_active'):
             item = random.choice(IMAGE_QUIZ)
