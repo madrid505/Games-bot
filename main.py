@@ -55,9 +55,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     allowed, is_owner, is_admin = await check_auth(update, context)
     user_data = await get_user_data(update, context)
+    
+    # زيادة النقاط تلقائياً مع كل رسالة
     db.update({'points': user_data.get('points', 0) + 1}, User.id == user_id)
 
-    # --- أمر "العاب" لعرض القائمة كاملة ---
+    # --- أمر "العاب" لعرض القائمة ---
     if text in ["العاب", "ألعاب", "قائمة الالعاب"]:
         games_menu = (
             "🎮 **قائمة ألعاب مونوبولي العظيم** 🎮\n\n"
@@ -78,11 +80,17 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(games_menu, parse_mode="Markdown")
         return
 
-    # --- أوامر التحكم ---
-    if text in ["فتح", "فتح الالعاب"]:
+    # --- أوامر التحكم (فتح / قفل) ---
+    if text in ["فتح", "فتح الالعاب", "فتح الألعاب"]:
         if is_owner or is_admin:
-            context.chat_data['games_active'] = True
+            context.chat_data['games_enabled'] = True
             await update.message.reply_text("✅ تم فتح الألعاب بنجاح!")
+        return
+
+    if text in ["قفل", "قفل الالعاب", "قفل الألعاب"]:
+        if is_owner or is_admin:
+            context.chat_data['games_enabled'] = False
+            await update.message.reply_text("🔒 تم قفل الألعاب.")
         return
 
     # --- أوامر البنك والخدمات ---
@@ -115,7 +123,19 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else: await update.message.reply_text("❌ لا يوجد ضحية غني حالياً")
         else: await update.message.reply_text("⏳ الزرف كل 10 دقائق")
 
-    # --- رسالة ملك التفاعل الملكية (المحدثة) ---
+    elif text == "حظ":
+        if current_time - user_data.get('last_luck', 0) > 300:
+            if random.random() > 0.5:
+                amt = random.randint(5000000, 100000000)
+                db.update({'balance': user_data['balance'] + amt, 'last_luck': current_time}, User.id == user_id)
+                await update.message.reply_text(f"🍀 حظك حلو! كسبت {amt:,} ريال")
+            else:
+                amt = random.randint(5000000, 50000000)
+                db.update({'balance': max(0, user_data['balance'] - amt), 'last_luck': current_time}, User.id == user_id)
+                await update.message.reply_text(f"💀 حظك سيء.. خسرت {amt:,} ريال")
+        else: await update.message.reply_text("⏳ جرب حظك كل 5 دقائق")
+
+    # --- ملك التفاعل (الرسالة الملكية) ---
     elif text == "ملك التفاعل" and (is_owner or is_admin):
         all_u = db.all()
         if all_u:
@@ -131,7 +151,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(msg)
                 for u in all_u: db.update({'points': 0}, User.id == u['id'])
 
-    # --- لعبة الروليت (الرسائل الأصلية) ---
+    # --- الروليت (الرسائل الملكية الأصلية) ---
     elif text == "روليت":
         if is_owner or is_admin:
             context.chat_data['r_on'] = True
@@ -140,8 +160,9 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
 
     elif text == "انا" and context.chat_data.get('r_on'):
-        context.chat_data['r_players'].append({'id': user_id, 'name': user_name})
-        await update.message.reply_text("📢🔥🌹 لقد تم تسجيلك يا بطل 🌹🔥📢")
+        if not any(p['id'] == user_id for p in context.chat_data['r_players']):
+            context.chat_data['r_players'].append({'id': user_id, 'name': user_name})
+            await update.message.reply_text("📢🔥🌹 لقد تم تسجيلك يا بطل 🌹🔥📢")
 
     elif text == "تم" and context.chat_data.get('r_on'):
         if user_id == context.chat_data.get('r_starter') or is_owner:
@@ -158,16 +179,18 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(win_msg)
             context.chat_data['r_on'] = False
 
-    # --- لعبة الصور ---
+    # --- لعبة الصور (الإصلاح الجذري للاستجابة) ---
     elif text in ["صورة", "الصورة", "صوره"]:
-        if context.chat_data.get('games_active'):
+        if context.chat_data.get('games_enabled') == True:
             item = random.choice(IMAGE_QUIZ)
-            context.chat_data['active_img_ans'] = item['answer']
+            context.chat_data['current_img_ans'] = item['answer']
             await update.message.reply_photo(photo=item['url'], caption="🖼 وش في الصورة؟ أسرع واحد يجاوب يربح 10 مليون!")
-        else: await update.message.reply_text("🚫 الألعاب مقفلة.. اطلب من المشرف فتحها")
+        else:
+            await update.message.reply_text("🚫 الألعاب مقفلة.. اطلب من المشرف فتحها عبر كتابة 'فتح'")
 
-    elif context.chat_data.get('active_img_ans') and text == context.chat_data.get('active_img_ans'):
-        context.chat_data['active_img_ans'] = None
+    # التحقق من إجابة الصورة
+    elif context.chat_data.get('current_img_ans') and text == context.chat_data.get('current_img_ans'):
+        context.chat_data['current_img_ans'] = None
         db.update({'balance': user_data['balance'] + 10000000}, User.id == user_id)
         await update.message.reply_text(f"🎉 كفو {user_name}! إجابة صحيحة وفزت بـ 10,000,000 ريال! ✅")
 
