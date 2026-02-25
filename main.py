@@ -15,13 +15,28 @@ User = Query()
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- قائمة صور جديدة بروابط مباشرة ومضمونة ---
+# --- مكتبة صور ضخمة ومتنوعة (روابط مباشرة) ---
 IMAGE_QUIZ = [
     {"url": "https://upload.wikimedia.org/wikipedia/ar/7/77/SpongeBob_SquarePants_characters.png", "answer": "سبونج بوب"},
     {"url": "https://upload.wikimedia.org/wikipedia/en/2/2f/Jerry_Mouse.png", "answer": "جيري"},
-    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/McDonald%27s_Golden_Arches.svg/1200px-McDonald%27s_Golden_Arches.svg.png", "answer": "ماكدونالدز"},
     {"url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Messi_vs_Nigeria_2018.jpg", "answer": "ميسي"},
-    {"url": "https://upload.wikimedia.org/wikipedia/commons/9/91/Pizza-3007395.jpg", "answer": "بيتزا"}
+    {"url": "https://upload.wikimedia.org/wikipedia/ar/thumb/f/f2/Cristiano_Ronaldo_2018.jpg/400px-Cristiano_Ronaldo_2018.jpg", "answer": "رونالدو"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Eiffel_Tower_Angled_Full_View.jpg/400px-Eiffel_Tower_Angled_Full_View.jpg", "answer": "برج ايفل"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/McDonald%27s_Golden_Arches.svg/1200px-McDonald%27s_Golden_Arches.svg.png", "answer": "ماكدونالدز"},
+    {"url": "https://upload.wikimedia.org/wikipedia/ar/thumb/1/1a/Logo_Apple.svg/300px-Logo_Apple.svg.png", "answer": "ابل"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/9/91/Pizza-3007395.jpg", "answer": "بيتزا"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Instagram_icon.png/600px-Instagram_icon.png", "answer": "انستقرام"},
+    {"url": "https://upload.wikimedia.org/wikipedia/ar/thumb/3/33/Mickey_Mouse_vector.svg/310px-Mickey_Mouse_vector.svg.png", "answer": "ميكي ماوس"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_\"G\"_Logo.svg/480px-Google_\"G\"_Logo.svg.png", "answer": "قوقل"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Statue_of_Liberty_7.jpg/330px-Statue_of_Liberty_7.jpg", "answer": "تمثال الحرية"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Facebook_Logo_%282019%29.png/600px-Facebook_Logo_%282019%29.png", "answer": "فيسبوك"},
+    {"url": "https://upload.wikimedia.org/wikipedia/ar/d/d0/Pikachu_ash.png", "answer": "بيكاتشو"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Lion_waiting_in_Namibia.jpg/400px-Lion_waiting_in_Namibia.jpg", "answer": "اسد"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Garden_strawberry_%28Fragaria_×_ananassa%29_single.jpg/400px-Garden_strawberry_%28Fragaria_×_ananassa%29_single.jpg", "answer": "فراولة"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/PHP-logo.svg/1200px-PHP-logo.svg.png", "answer": "فيل"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Pyramids_of_the_Giza_Necropolis.jpg/400px-Pyramids_of_the_Giza_Necropolis.jpg", "answer": "الاهرامات"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_Chrome_material_logo.svg/480px-Google_Chrome_material_logo.svg.png", "answer": "كروم"},
+    {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/YouTube_social_white_circle_%282017%29.svg/600px-YouTube_social_white_circle_%282017%29.svg.png", "answer": "يوتيوب"}
 ]
 
 async def check_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,12 +124,18 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"🥷 زرفت {amt:,} من {target['name']}")
         else: await update.message.reply_text("❌ لا يوجد ضحية غني حالياً")
 
-    # --- ملك التفاعل ---
+    # --- ملك التفاعل (الرسالة الملكية) ---
     elif text == "ملك التفاعل" and (is_owner or is_admin):
         all_u = db.all()
         if all_u:
             winner = max(all_u, key=lambda x: x.get('points', 0))
-            msg = (f"🔥🔥🔥 ملك التفاعل 🔥🔥\n\nاسم الملك : {winner['name']}\n\nعدد النقاط : {winner['points']}\n\nID : {winner['id']}\n\n🔥🔥 مبارك عليك الفوز يا اسطورة القروب 🔥🔥")
+            msg = (
+                "🔥🔥🔥 ملك التفاعل 🔥🔥\n\n"
+                f"اسم الملك : {winner['name']}\n\n"
+                f"عدد النقاط : {winner['points']}\n\n"
+                f"ID : {winner['id']}\n\n"
+                "🔥🔥 مبارك عليك الفوز يا اسطورة القروب 🔥🔥"
+            )
             await update.message.reply_text(msg)
             for u in all_u: db.update({'points': 0}, User.id == u['id'])
 
@@ -127,27 +148,38 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
 
     elif text == "انا" and context.chat_data.get('r_on'):
-        context.chat_data['r_players'].append({'id': user_id, 'name': user_name})
-        await update.message.reply_text("📢🔥🌹 لقد تم تسجيلك يا بطل 🌹🔥📢")
+        if not any(p['id'] == user_id for p in context.chat_data['r_players']):
+            context.chat_data['r_players'].append({'id': user_id, 'name': user_name})
+            await update.message.reply_text("📢🔥🌹 لقد تم تسجيلك يا بطل 🌹🔥📢")
 
     elif text == "تم" and context.chat_data.get('r_on'):
         players = context.chat_data.get('r_players', [])
         if players:
             winner = random.choice(players)
-            win_msg = (f"👑👑 مبااااارك عليك الفوز يا اسطورة 👑👑\n\n          👑 \" {winner['name']} \" 👑\n\n👈👈 استمر معنا بالمشاركة حتى تربح الجائزة الكبرى 👉👉")
+            win_msg = (
+                "👑👑 مبااااارك عليك الفوز يا اسطورة 👑👑\n\n"
+                f"          👑 \" {winner['name']} \" 👑\n\n"
+                "👈👈 استمر معنا بالمشاركة حتى تربح الجائزة الكبرى 👉👉"
+            )
             await update.message.reply_text(win_msg)
         context.chat_data['r_on'] = False
 
-    # --- لعبة الصور (إصلاح الروابط والاستجابة) ---
+    # --- لعبة الصور (المكتبة الضخمة) ---
     elif text in ["صورة", "الصورة", "صوره"]:
         if context.chat_data.get('active'):
             try:
+                # محاولة اختيار صورة مختلفة عن السابقة
+                last_url = context.chat_data.get('last_img_url')
                 item = random.choice(IMAGE_QUIZ)
+                while item['url'] == last_url and len(IMAGE_QUIZ) > 1:
+                    item = random.choice(IMAGE_QUIZ)
+                
+                context.chat_data['last_img_url'] = item['url']
                 context.chat_data['ans'] = item['answer']
                 await update.message.reply_photo(photo=item['url'], caption="🖼 وش في الصورة؟ أسرع واحد يجاوب يربح 10 مليون!")
             except Exception as e:
-                logging.error(f"Error sending photo: {e}")
-                await update.message.reply_text("⚠️ خلل في جلب الصورة، حاول مرة أخرى.")
+                logging.error(f"Error: {e}")
+                await update.message.reply_text("⚠️ حدث خطأ بسيط، جرب طلب صورة أخرى.")
         else: await update.message.reply_text("🚫 الألعاب مقفلة.. اطلب من المشرف فتحها")
 
     elif context.chat_data.get('ans') and text == context.chat_data.get('ans'):
