@@ -3,7 +3,7 @@ import random
 import time
 from tinydb import TinyDB, Query
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
 # --- الإعدادات ---
 BOT_TOKEN = "8613134391:AAEfV8sqV7_Kh5g9KG5xT8S9mwl0eqVxFBI"
@@ -24,7 +24,6 @@ IMAGE_QUIZ = [
     {"url": "https://bit.ly/3vL9Y3e", "answer": "بيتزا"}
 ]
 
-# --- التحقق من الرتبة ---
 async def check_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or not update.effective_user: return False, False, False
     user_id = update.effective_user.id
@@ -35,18 +34,16 @@ async def check_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: is_admin = False
     return True, is_owner, is_admin
 
-# --- نظام البيانات ---
 async def get_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data = db.get(User.id == user_id)
     if not user_data:
         _, is_owner, is_admin = await check_auth(update, context)
         balance = 500000000000 if is_owner else (100000000000 if is_admin else 10000000000)
-        db.insert({'id': user_id, 'name': update.effective_user.first_name, 'balance': balance, 'points': 0, 'last_salary': 0, 'last_tip': 0, 'last_rob': 0, 'last_treasure': 0})
+        db.insert({'id': user_id, 'name': update.effective_user.first_name, 'balance': balance, 'points': 0, 'last_salary': 0, 'last_rob': 0, 'last_treasure': 0, 'last_luck': 0})
         user_data = db.get(User.id == user_id)
     return user_data
 
-# --- المعالج الرئيسي ---
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     text = update.message.text.strip()
@@ -54,109 +51,121 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
     current_time = time.time()
     
-    # التأكد من المجموعة المسموحة
     if update.effective_chat.id not in ALLOWED_GROUPS: return
 
     allowed, is_owner, is_admin = await check_auth(update, context)
     user_data = await get_user_data(update, context)
-
-    # زيادة النقاط تلقائياً
     db.update({'points': user_data.get('points', 0) + 1}, User.id == user_id)
 
-    # --- أوامر المعلومات ---
+    # --- أوامر البنك ---
     if text == "رصيدي":
         await update.message.reply_text(f"👤 {user_name}\n💰 رصيدك: {user_data['balance']:,} ريال\n⭐ نقاطك: {user_data.get('points', 0)}")
-        return
-
-    # --- أوامر كسب المال ---
-    if text == "راتب":
+    
+    elif text == "راتب":
         if current_time - user_data.get('last_salary', 0) > 1200:
             amt = random.randint(5000000, 20000000)
             db.update({'balance': user_data['balance'] + amt, 'last_salary': current_time}, User.id == user_id)
             await update.message.reply_text(f"💵 استلمت راتبك: {amt:,} ريال")
         else: await update.message.reply_text("⏳ الراتب متاح كل 20 دقيقة")
-        return
 
-    if text == "كنز":
+    elif text == "كنز":
         if current_time - user_data.get('last_treasure', 0) > 3600:
             amt = random.randint(50000000, 200000000)
             db.update({'balance': user_data['balance'] + amt, 'last_treasure': current_time}, User.id == user_id)
             await update.message.reply_text(f"💎 مبروك وجدت كنزاً: {amt:,} ريال")
         else: await update.message.reply_text("⏳ الكنز متاح كل ساعة")
-        return
 
-    if text == "زرف":
+    elif text == "زرف":
         if current_time - user_data.get('last_rob', 0) > 600:
             others = [u for u in db.all() if u['id'] != user_id and u['balance'] > 10000000]
             if others:
                 target = random.choice(others)
-                amt = random.randint(1000000, int(target['balance'] * 0.03))
+                amt = random.randint(1000000, int(target['balance'] * 0.05))
                 db.update({'balance': user_data['balance'] + amt, 'last_rob': current_time}, User.id == user_id)
                 db.update({'balance': target['balance'] - amt}, User.id == target['id'])
                 await update.message.reply_text(f"🥷 زرفت {amt:,} من {target['name']}")
             else: await update.message.reply_text("❌ لا يوجد ضحية غني حالياً")
         else: await update.message.reply_text("⏳ الزرف كل 10 دقائق")
-        return
 
-    # --- أوامر الإدارة ---
-    if text == "فتح الالعاب" or text == "فتح":
-        if is_owner or is_admin:
-            context.chat_data['g_active'] = True
-            await update.message.reply_text("✅ تم فتح الألعاب")
-        return
+    elif text == "حظ":
+        if current_time - user_data.get('last_luck', 0) > 300:
+            if random.random() > 0.5:
+                amt = random.randint(5000000, 100000000)
+                db.update({'balance': user_data['balance'] + amt, 'last_luck': current_time}, User.id == user_id)
+                await update.message.reply_text(f"🍀 حظك حلو! كسبت {amt:,} ريال")
+            else:
+                amt = random.randint(5000000, 50000000)
+                db.update({'balance': max(0, user_data['balance'] - amt), 'last_luck': current_time}, User.id == user_id)
+                await update.message.reply_text(f"💀 حظك سيء.. خسرت {amt:,} ريال")
+        else: await update.message.reply_text("⏳ جرب حظك كل 5 دقائق")
 
-    if text == "قفل الالعاب" or text == "قفل":
-        if is_owner or is_admin:
-            context.chat_data['g_active'] = False
-            await update.message.reply_text("🔒 تم قفل الألعاب")
-        return
+    elif text.startswith("هدية") and is_owner:
+        try:
+            gift_amt = int(text.split()[1])
+            for u in db.all(): db.update({'balance': u['balance'] + gift_amt}, User.id == u['id'])
+            await update.message.reply_text(f"🎁 المالك وزع هدية {gift_amt:,} للجميع!")
+        except: pass
 
-    if text == "ملك التفاعل" and (is_owner or is_admin):
+    # --- مسابقة ملك التفاعل (الرسالة الأصلية كما طلبتها) ---
+    elif text == "ملك التفاعل" and (is_owner or is_admin):
         all_u = db.all()
         if all_u:
-            top = max(all_u, key=lambda x: x.get('points', 0))
-            await update.message.reply_text(f"🔥🔥 ملك التفاعل 🔥🔥\n\nالملك: {top['name']}\nالنقاط: {top['points']}\nID: {top['id']}\n\n🏆 مبارك يا اسطورة")
-            for u in all_u: db.update({'points': 0}, User.id == u['id'])
-        return
+            winner = max(all_u, key=lambda x: x.get('points', 0))
+            if winner.get('points', 0) > 0:
+                msg = (
+                    "🔥🔥🔥 ملك التفاعل 🔥🔥\n\n"
+                    f"اسم الملك : {winner['name']}\n\n"
+                    f"عدد النقاط : {winner['points']}\n\n"
+                    f"ID : {winner['id']}\n\n"
+                    "🔥🔥 مبارك عليك الفوز يا اسطورة القروب 🔥🔥"
+                )
+                await update.message.reply_text(msg)
+                for u in all_u: db.update({'points': 0}, User.id == u['id'])
 
-    # --- الألعاب (الروليت والصور) ---
-    if text == "روليت":
+    # --- لعبة الروليت (الرسائل الأصلية الملكية) ---
+    elif text == "روليت":
         if is_owner or is_admin:
             context.chat_data['r_on'] = True
             context.chat_data['r_players'] = []
             context.chat_data['r_starter'] = user_id
-            await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\nلقد بدأ الروليت.. اكتب (انا) للاشتراك")
-        return
+            await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
 
-    if text == "انا" and context.chat_data.get('r_on'):
+    elif text == "انا" and context.chat_data.get('r_on'):
         context.chat_data['r_players'].append({'id': user_id, 'name': user_name})
-        await update.message.reply_text("📢🔥 لقد تم تسجيلك يا بطل")
-        return
+        await update.message.reply_text("📢🔥🌹 لقد تم تسجيلك يا بطل 🌹🔥📢")
 
-    if text == "تم" and context.chat_data.get('r_on'):
+    elif text == "تم" and context.chat_data.get('r_on'):
         if user_id == context.chat_data.get('r_starter') or is_owner:
             players = context.chat_data.get('r_players', [])
             if players:
                 winner = random.choice(players)
-                w_data = db.get(User.id == winner['id'])
-                db.update({'points': w_data.get('points', 0) + 1}, User.id == winner['id'])
-                await update.message.reply_text(f"👑 مباااارك عليك الفوز 👑\n\n👑 {winner['name']} 👑")
+                w_db = db.get(User.id == winner['id'])
+                db.update({'points': w_db.get('points', 0) + 1}, User.id == winner['id'])
+                win_msg = (
+                    "👑👑 مبااااارك عليك الفوز يا اسطورة 👑👑\n\n"
+                    f"          👑 \" {winner['name']} \" 👑\n\n"
+                    "👈👈 استمر معنا بالمشاركة حتى تربح الجائزة الكبرى 👉👉"
+                )
+                await update.message.reply_text(win_msg)
             context.chat_data['r_on'] = False
-        return
 
-    if text == "صورة" or text == "الصورة":
-        if context.chat_data.get('g_active'):
+    # --- لعبة الصور (إصلاح شامل للاستجابة) ---
+    elif text == "فتح":
+        if is_owner or is_admin:
+            context.chat_data['games_active'] = True
+            await update.message.reply_text("✅ تم فتح الألعاب")
+
+    elif text in ["صورة", "الصورة", "صوره"]:
+        if context.chat_data.get('games_active'):
             item = random.choice(IMAGE_QUIZ)
-            context.chat_data['img_ans'] = item['answer']
-            await update.message.reply_photo(photo=item['url'], caption="🖼 وش في الصورة؟")
-        else: await update.message.reply_text("🚫 الألعاب مقفلة")
-        return
+            context.chat_data['active_img_ans'] = item['answer']
+            await update.message.reply_photo(photo=item['url'], caption="🖼 وش في الصورة؟ أسرع واحد يجاوب يربح 10 مليون!")
+        else: await update.message.reply_text("🚫 الألعاب مقفلة.. اطلب من المشرف فتحها")
 
-    # التحقق من إجابة الصورة
-    if context.chat_data.get('img_ans') and text == context.chat_data.get('img_ans'):
-        context.chat_data['img_ans'] = None
+    elif context.chat_data.get('active_img_ans') and text == context.chat_data.get('active_img_ans'):
+        context.chat_data['active_img_ans'] = None
         db.update({'balance': user_data['balance'] + 10000000}, User.id == user_id)
-        await update.message.reply_text(f"🎉 كفو {user_name}! إجابة صحيحة وفزت بـ 10 مليون")
+        await update.message.reply_text(f"🎉 كفو {user_name}! إجابة صحيحة وفزت بـ 10,000,000 ريال! ✅")
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
