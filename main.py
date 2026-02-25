@@ -15,7 +15,7 @@ User = Query()
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- بيانات الصور المتنوعة ---
+# --- صور لعبة الصور ---
 IMAGE_QUIZ = [
     {"url": "https://bit.ly/3S8fW1u", "answer": "سبونج بوب"},
     {"url": "https://bit.ly/48GvE7G", "answer": "توم وجيري"},
@@ -24,7 +24,7 @@ IMAGE_QUIZ = [
     {"url": "https://bit.ly/3vL9Y3e", "answer": "بيتزا"}
 ]
 
-# --- نظام الصلاحيات ---
+# --- دالة فحص الصلاحيات ---
 async def check_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or not update.effective_user: return False, False, False
     chat_id = update.effective_chat.id
@@ -39,80 +39,105 @@ async def check_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: is_admin = False
     return True, is_owner, is_admin
 
-# --- جلب البيانات وتوزيع الرصيد الآلي ---
+# --- جلب بيانات المستخدم ---
 async def get_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data = db.get(User.id == user_id)
     if not user_data:
         allowed, is_owner, is_admin = await check_auth(update, context)
-        # 500 مليار للمالك، 100 مليار للمشرف، 10 مليار للعضو
         balance = 500000000000 if is_owner else (100000000000 if is_admin else 10000000000)
         db.insert({
             'id': user_id, 'name': update.effective_user.first_name,
             'balance': balance, 'points': 0, 'last_salary': 0, 
-            'last_tip': 0, 'last_rob': 0, 'last_treasure': 0
+            'last_tip': 0, 'last_rob': 0
         })
         user_data = db.get(User.id == user_id)
     return user_data
 
-# --- وظيفة إعلان الفائز بملك التفاعل ---
-async def announce_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    all_users = db.all()
-    if not all_users: return
-    winner = max(all_users, key=lambda x: x.get('points', 0))
-    if winner.get('points', 0) == 0:
-        return await update.message.reply_text("📉 لا يوجد تفاعل كافٍ حالياً لإعلان ملك الأسبوع.")
-
-    text = (
-        "🔥🔥🔥 ملك التفاعل 🔥🔥\n\n"
-        f"اسم الملك : {winner['name']}\n\n"
-        f"عدد النقاط : {winner['points']}\n\n"
-        f"ID : {winner['id']}\n\n"
-        "🔥🔥 مبارك عليك الفوز يا اسطورة القروب 🔥🔥"
-    )
-    await update.message.reply_text(text)
-    # تصفير النقاط للمسابقة الجديدة
-    for u in all_users: db.update({'points': 0}, User.id == u['id'])
-
-# --- معالج الرسائل الرئيسي ---
+# --- المعالج الرئيسي ---
 async def handle_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     text = update.message.text.strip()
     user_id = update.effective_user.id
     user_name = update.effective_user.first_name
-    current_time = time.time()
     
     allowed, is_owner, is_admin = await check_auth(update, context)
     if not allowed: return
     user_data = await get_user_data(update, context)
 
-    # حساب نقاط التفاعل
+    # حساب نقاط التفاعل العام
     db.update({'points': user_data.get('points', 0) + 1}, User.id == user_id)
 
-    # --- الأوامر المباشرة ---
+    # --- [1] لعبة الروليت الجديدة ---
+    if text == "روليت":
+        if is_owner or is_admin:
+            context.chat_data['roulette_active'] = True
+            context.chat_data['roulette_players'] = []
+            context.chat_data['roulette_starter'] = user_id
+            msg = (
+                "🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n"
+                "👈 لقد بدأت لعبة الروليت 👉\n\n"
+                "🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹"
+            )
+            await update.message.reply_text(msg)
+        return
+
+    if text == "انا" and context.chat_data.get('roulette_active'):
+        # إضافة اللاعب للقائمة (مسموح التكرار لزيادة فرص الفوز كما طلبت)
+        context.chat_data['roulette_players'].append({'id': user_id, 'name': user_name})
+        await update.message.reply_text("📢🔥🌹 لقد تم تسجيلك يا بطل 🌹🔥📢")
+        return
+
+    if text == "تم" and context.chat_data.get('roulette_active'):
+        # فقط من بدأ الروليت أو المالك يمكنه إنهاؤها
+        if user_id == context.chat_data.get('roulette_starter') or is_owner:
+            players = context.chat_data.get('roulette_players', [])
+            if not players:
+                context.chat_data['roulette_active'] = False
+                return await update.message.reply_text("❌ انتهى الروليت بدون مشاركين.")
+            
+            winner = random.choice(players)
+            # إضافة نقطة واحدة للفائز في الروليت
+            winner_data = db.get(User.id == winner['id'])
+            if winner_data:
+                db.update({'points': winner_data.get('points', 0) + 1}, User.id == winner['id'])
+            
+            win_msg = (
+                "👑👑 مبااااارك عليك الفوز يا اسطورة 👑👑\n\n"
+                f"          👑 \" {winner['name']} \" 👑\n\n"
+                "👈👈 استمر معنا بالمشاركة حتى تربح الجائزة الكبرى 👉👉"
+            )
+            context.chat_data['roulette_active'] = False
+            await update.message.reply_text(win_msg)
+        return
+
+    # --- [2] أوامر البنك والمعلومات ---
     if text == "رصيدي":
         await update.message.reply_text(f"👤 {user_name}\n💰 رصيدك: {user_data['balance']:,}\n⭐ نقاطك: {user_data.get('points', 0)}")
     
-    elif text == "نقاطي":
-        await update.message.reply_text(f"⭐ نقاط تفاعلك: {user_data.get('points', 0)}")
-
     elif text == "ملك التفاعل" and (is_owner or is_admin):
-        await announce_winner(update, context)
+        all_users = db.all()
+        if all_users:
+            top_v = max(all_users, key=lambda x: x.get('points', 0))
+            if top_v.get('points', 0) > 0:
+                res = (f"🔥🔥🔥 ملك التفاعل 🔥🔥\n\nاسم الملك : {top_v['name']}\n\nعدد النقاط : {top_v['points']}\n\nID : {top_v['id']}\n\n🔥🔥 مبارك عليك الفوز يا اسطورة القروب 🔥🔥")
+                await update.message.reply_text(res)
+                for u in all_users: db.update({'points': 0}, User.id == u['id'])
 
     elif text == "فتح" and (is_owner or is_admin):
-        context.chat_data['status'] = 'open'
+        context.chat_data['games_status'] = 'open'
         await update.message.reply_text("✅ تم فتح الألعاب!")
 
     elif text == "صورة":
-        if context.chat_data.get('status') != 'open': return await update.message.reply_text("🚫 الألعاب مقفلة.")
-        item = random.choice(IMAGE_QUIZ)
-        context.chat_data['game'] = 'image'
-        context.chat_data['ans'] = item['answer']
-        await update.message.reply_photo(photo=item['url'], caption="🖼 وش في الصورة؟")
+        if context.chat_data.get('games_status') == 'open':
+            item = random.choice(IMAGE_QUIZ)
+            context.chat_data['img_game'] = True
+            context.chat_data['img_ans'] = item['answer']
+            await update.message.reply_photo(photo=item['url'], caption="🖼 وش في الصورة؟")
 
     # التحقق من إجابة الصورة
-    if context.chat_data.get('game') == 'image' and text == context.chat_data.get('ans'):
-        context.chat_data['game'] = None
+    if context.chat_data.get('img_game') and text == context.chat_data.get('img_ans'):
+        context.chat_data['img_game'] = False
         db.update({'balance': user_data['balance'] + 10000000}, User.id == user_id)
         await update.message.reply_text(f"🎉 كفو {user_name}! فزت بـ 10 مليون! ✅")
 
