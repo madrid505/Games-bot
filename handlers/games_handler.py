@@ -7,6 +7,7 @@ from db import get_user_data, db, User
 from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 
+# تحميل الـ 13 لعبة
 QUESTIONS = load_questions()
 
 def get_main_menu_keyboard():
@@ -23,29 +24,17 @@ def get_main_menu_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # تشخيص: هل وصلت الرسالة؟
-    if not update.message or not update.message.text:
+    if not update.effective_chat or update.effective_chat.id not in GROUP_IDS or not update.message or not update.message.text:
         return
 
-    chat_id = update.effective_chat.id
     text = update.message.text.strip()
     u_id = update.effective_user.id
     u_name = update.effective_user.first_name
-
-    # تشخيص السيرفر: اطبع في اللوج لمعرفة ما يحدث
-    print(f"📩 رسالة جديدة من {u_name} في جروب {chat_id}: {text}")
-
-    # التحقق من الجروبات المسموحة
-    if chat_id not in GROUP_IDS:
-        print(f"🚫 الجروب {chat_id} غير مسموح به في config.py")
-        return
-
     u_data = await get_user_data(update)
 
-    # --- 🏆 1. ملك التفاعل (تأكد من الحفظ في قاعدة البيانات) ---
+    # --- 🏆 1. ملك التفاعل (صياد الرسائل) ---
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
-    print(f"📈 عداد التفاعل لـ {u_name} أصبح: {current_msgs}")
     
     if current_msgs >= 1000:
         await update.message.reply_text(
@@ -57,28 +46,71 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         db.update({'msg_count': 0}, User.id == u_id)
 
-    # --- 🏦 2. أوامر البنك ---
+    # --- 🏦 2. أوامر البنك الملكية الشاملة ---
+    
+    # أمر الرصيد
     if text == "رصيدي":
-        print(f"💰 {u_name} طلب الرصيد")
         await update.message.reply_text(f"🏦 **مصرف مونوبولي المركزي**\n👤 الاسم: {u_name}\n💰 الرصيد: {u_data['balance']:,} دينار\n🏆 النقاط: {u_data['points']}")
         return
 
+    # أمر قائمة الهوامير
+    elif text == "توب":
+        top = sorted(db.all(), key=lambda x: x.get('balance', 0), reverse=True)[:10]
+        msg = "🏆 **أغنى 10 هوامير في مونوبولي:**\n\n"
+        for i, u in enumerate(top, 1):
+            msg += f"{i} - {u['name']} ⮕ ({u['balance']:,} د)\n"
+        await update.message.reply_text(msg)
+        return
+
+    # أمر الراتب
     elif text == "راتب":
         now = time.time()
-        last_s = u_data.get('last_salary', 0)
-        if now - last_s > 3600:
+        if now - u_data.get('last_salary', 0) > 3600:
             salary = random.randint(500000, 1000000)
             db.update({'balance': u_data['balance'] + salary, 'last_salary': now}, User.id == u_id)
             await update.message.reply_text(f"💵 **المرسوم الملكي:** تم إيداع راتبك وقدره {salary:,} دينار.")
         else:
-            rem = int((3600 - (now - last_s)) / 60)
-            await update.message.reply_text(f"⏳ ارجع بعد {rem} دقيقة.")
+            rem = int((3600 - (now - u_data['last_salary'])) / 60)
+            await update.message.reply_text(f"⏳ **مهلاً يا ملك:** الراتب لم ينزل بعد، ارجع بعد {rem} دقيقة.")
         return
 
-    # --- 🎰 3. الروليت ---
+    # أمر بخشيش
+    elif text == "بخشيش":
+        tip = random.randint(50000, 150000)
+        db.update({'balance': u_data['balance'] + tip}, User.id == u_id)
+        await update.message.reply_text(f"🎁 **بخشيش ملكي:** استلمت {tip:,} دينار من خزينة الدولة.")
+        return
+
+    # أمر زرف (سرقة)
+    elif text == "زرف" and update.message.reply_to_message:
+        target = update.message.reply_to_message.from_user
+        t_data = await get_user_data(update.message.reply_to_message)
+        if t_data['balance'] > 100000:
+            steal = random.randint(10000, 100000)
+            db.update({'balance': u_data['balance'] + steal}, User.id == u_id)
+            db.update({'balance': t_data['balance'] - steal}, User.id = target.id)
+            await update.message.reply_text(f"🥷 **عملية زرف ناجحة:** سرقت {steal:,} من {target.first_name}!")
+        else:
+            await update.message.reply_text("❌ الشخص فقير جداً لا يستحق الزرف.")
+        return
+
+    # أمر استثمار / حظ
+    elif text in ["حظ", "استثمار", "مضاربة"]:
+        amt = random.randint(100000, 1000000)
+        if random.random() > 0.5:
+            db.update({'balance': u_data['balance'] + amt}, User.id == u_id)
+            await update.message.reply_text(f"📈 **استثمار ناجح:** كسبت {amt:,} دينار!")
+        else:
+            db.update({'balance': max(0, u_data['balance'] - amt)}, User.id == u_id)
+            await update.message.reply_text(f"📉 **خسارة فادحة:** فقدت {amt:,} دينار في البورصة.")
+        return
+
+    # --- 🎰 3. الروليت الملكية ---
     if text == "روليت":
-        context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], u_id
-        await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
+        admins = [admin.user.id for admin in await context.bot.get_chat_administrators(update.effective_chat.id)]
+        if u_id == OWNER_ID or u_id in admins:
+            context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], u_id
+            await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
         return
 
     if text == "انا" and context.chat_data.get('r_on'):
@@ -87,29 +119,61 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📢🔥🌹 لقد تم تسجيلك يا بطل 🌹🔥📢")
         return
 
-    # --- 🎲 4. الألعاب ---
-    if text in ["قائمة", "الاوامر"]:
-        await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑", reply_markup=get_main_menu_keyboard())
+    if text == "تم" and context.chat_data.get('r_on') and u_id == context.chat_data['r_starter']:
+        players = context.chat_data.get('r_players', [])
+        if players:
+            win = random.choice(players)
+            w_db = db.get(User.id == win['id'])
+            new_w = (w_db.get('roulette_wins', 0) if w_db else 0) + 1
+            db.update({'roulette_wins': new_w}, User.id == win['id'])
+            await update.message.reply_text(f"👑👑 مباااابارك عليك الفوز يا اسطورة 👑👑\n\n👑 \" {win['name']} \" 👑\n🏆 فوزك رقم: ( {new_w} )\n👈👈 استمر معنا حتى الجائزة الكبرى 👉👉")
+            if new_w >= 5:
+                await update.message.reply_text(f"👑👑👑 ملك الروليت 👑👑👑\n\n👑 \" {win['name']} \" 👑\n\n🔥🔥 \"5 نقاط\"🔥🔥")
+                for u in db.all(): db.update({'roulette_wins': 0}, User.id == u['id'])
+        context.chat_data['r_on'] = False
+        return
+
+    # --- 🎲 4. قائمة الأوامر والألعاب ---
+    if text in ["قائمة", "الاوامر", "الأوامر", "/start"]:
+        await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑\n\nاختر لعبتك يا ملك:", reply_markup=get_main_menu_keyboard())
         return
 
     correct_ans = context.chat_data.get('game_ans')
     if correct_ans and text == correct_ans:
         db.update({'balance': u_data['balance'] + 50000, 'points': u_data['points'] + 1}, User.id == u_id)
-        await update.message.reply_text(f"✅ كفو يا {u_name}! فزت بـ 50 ألف.")
+        await update.message.reply_text(f"✅ **كفو يا بطل!**\n\nإجابتك صحيحة وفزت بـ 50,000 دينار ونقطة ملكية!")
         context.chat_data['game_ans'] = None
         return
 
     if text in QUESTIONS:
         q_data = random.choice(QUESTIONS[text])
         context.chat_data['game_ans'] = q_data['answer']
-        await update.message.reply_text(f"🎮 لعبة {text}:\n【 {q_data['question']} 】")
+        cap = f"🎮 بدأت لعبة {text}:\n\n━━━━━━━━━━━━━\n【 {q_data['question']} 】\n━━━━━━━━━━━━━"
+        if q_data.get('image') and os.path.exists(q_data['image']):
+            await update.message.reply_photo(photo=open(q_data['image'], 'rb'), caption=cap)
+        else:
+            await update.message.reply_text(cap)
 
+# معالج ضغطات الأزرار (Callback)
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    u_id = query.from_user.id
     if query.data.startswith("run_"):
         game = query.data.replace("run_", "")
         if game in QUESTIONS:
             q = random.choice(QUESTIONS[game])
             context.chat_data['game_ans'] = q['answer']
-            await query.message.reply_text(f"🎮 بدأت {game}:\n【 {q['question']} 】")
+            cap = f"🎮 بدأت {game}:\n【 {q['question']} 】"
+            if q.get('image') and os.path.exists(q['image']):
+                await query.message.reply_photo(photo=open(q['image'], 'rb'), caption=cap)
+            else:
+                await query.message.reply_text(cap)
+    elif query.data == "cmd_balance":
+        u = db.get(User.id == u_id)
+        await query.message.reply_text(f"💰 **رصيدك الملكي:** {u['balance']:,} دينار.")
+    elif query.data == "cmd_top":
+        top = sorted(db.all(), key=lambda x: x.get('balance', 0), reverse=True)[:10]
+        msg = "🏆 قائمة الهوامير:\n\n"
+        for i, u in enumerate(top, 1): msg += f"{i} - {u['name']} ({u['balance']:,})\n"
+        await query.message.reply_text(msg)
