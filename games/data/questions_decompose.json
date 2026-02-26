@@ -1,0 +1,12 @@
+[
+  {"question": "مملكة", "answer": "م م ل ك ة"},
+  {"question": "فلسطين", "answer": "ف ل س ط ي ن"},
+  {"question": "سيارة", "answer": "س ي ا ر ة"},
+  {"question": "مدرسة", "answer": "م د ر س ة"},
+  {"question": "جامعة", "answer": "ج ا م ع ة"},
+  {"question": "هاتف", "answer": "ه ا ت ف"},
+  {"question": "حاسوب", "answer": "ح ا س و ب"},
+  {"question": "مدينة", "answer": "م د ي ن ة"},
+  {"question": "نهر", "answer": "ن ه ر"},
+  {"question": "مستشفى", "answer": "م س ت ش ف ى"}
+]
