@@ -18,10 +18,10 @@ User = Query()
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- بنك الأسئلة ---
+# --- بنك الأسئلة الموسع ---
 GAMES_DATA = {
     "اسئله": [("ما هي عاصمة السعودية؟", "الرياض"), ("من هو خاتم الأنبياء؟", "محمد"), ("كم عدد قارات العالم؟", "7")],
-    "دين": [("من هو أول من أسلم من الرجال؟", "أبو بكر الصديق"), ("ما هي أطول سورة في القرآن؟", "البقرة"), ("كم عدد الرسل في القرآن؟", "25")],
+    "دين": [("من هو أول من أسلم من الرجال؟", "أبو بكر الصديق"), ("ما هي أطول سورة في القرآن؟", "البقرة"), ("من الملقب بذي النورين؟", "عثمان بن عفان")],
     "ثقافه": [("ما هو أسرع حيوان بري؟", "الفهد"), ("أين يوجد برج إيفل؟", "باريس"), ("كم قلب للأخطبوط؟", "3")],
     "انجليزي": [("معنى Apple؟", "تفاح"), ("عكس Hot؟", "Cold"), ("كلمة School؟", "مدرسة")],
     "رياضيات": [("5 + 7 * 2", "19"), ("100 / 4", "25"), ("9 * 9", "81")],
@@ -49,6 +49,8 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if update.effective_chat.id not in ALLOWED_GROUPS: return
     u_data = await get_user_data(update, context)
+    
+    # تحديث النقاط لملك التفاعل
     db.update({'points': u_data.get('points', 0) + 1, 'name': user_name}, User.id == user_id)
 
     # --- [1] أوامر البنك ---
@@ -96,7 +98,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.update({'balance': u_data['balance'] + 10000000}, User.id == user_id)
         await update.message.reply_text(f"✅ كفو {user_name}! إجابة صح وفزت بـ 10,000,000 ريال!")
 
-    # --- [3] الروليت (الرسائل الملكية الأصلية) ---
+    # --- [3] الروليت (الرسائل الملكية الأصلية + إصلاح الخطأ) ---
     elif text == "روليت":
         context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], user_id
         await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
@@ -113,12 +115,12 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 w_id = winner_raw['id']
                 w_db = db.get(User.id == w_id)
                 new_w = w_db.get('roulette_wins', 0) + 1
-                db.update({'roulette_wins': new_w}, User.id = w_id)
                 
-                # رسالة الفوز بالجولة الأصلية
+                # الإصلاح هنا: استخدام == بدلاً من =
+                db.update({'roulette_wins': new_w}, User.id == w_id)
+                
                 await update.message.reply_text(f"👑👑 مبااااارك عليك الفوز يا اسطورة 👑👑\n\n          👑 \" {winner_raw['name']} \" 👑\n\n🏆 فوزك رقم: ( {new_w} )\n\n👈👈 استمر معنا بالمشاركة حتى تربح الجائزة الكبرى 👉👉")
                 
-                # إعلان ملك الروليت عند 5 نقاط
                 if new_w >= 5:
                     final_msg = (f"👑👑👑 ملك الروليت 👑👑👑\n\n             👑 \" {winner_raw['name']} \" 👑\n\n       🔥🔥 \"{new_w} نقاط\"🔥🔥")
                     await update.message.reply_text(final_msg)
@@ -134,8 +136,8 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg += f"{icons[i]} \" {u['name']} \" + ( {u['roulette_wins']} )\n"
         await update.message.reply_text(msg if "1-" in msg else "لا توجد نقاط مسجلة بعد.")
 
-    # --- [4] ملك التفاعل (الرسالة الملكية الأصلية) ---
-    elif text == "ملك التفاعل" and (user_id == OWNER_ID or True): # السماح للكل مؤقتاً للتجربة
+    # --- [4] ملك التفاعل ---
+    elif text == "ملك التفاعل":
         all_users = db.all()
         if all_users:
             winner = max(all_users, key=lambda x: x.get('points', 0))
@@ -152,7 +154,4 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
-    app.run_polling()
-
-if __name__ == '__main__': main()
+    app.add_handler(
