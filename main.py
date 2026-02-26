@@ -1,15 +1,21 @@
+# main.py
 import logging
 from telegram.ext import Application, MessageHandler, CallbackQueryHandler, filters
 from handlers import register_handlers
+from config import BOT_TOKEN
 
-# إعداد السجلات
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
-
-BOT_TOKEN = "8613134391:AAEfV8sqV7_Kh5g9KG5xT8S9mwl0eqVxFBI"
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
+
+    # تسجيل جميع ال handlers
     register_handlers(app)
+
+    # بدء البوت
     app.run_polling()
 
 if __name__ == "__main__":
