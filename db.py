@@ -1,4 +1,6 @@
+# db.py
 from tinydb import TinyDB, Query
+import time
 
 db = TinyDB('bank_data.json')
 User = Query()
@@ -7,6 +9,7 @@ async def get_user_data(update):
     user_id = update.effective_user.id
     u_data = db.get(User.id == user_id)
     if not u_data:
+        # المالك رصيد ضخم، واللاعبين 10 مليار كبداية
         balance = 1000000000000 if user_id == 5010882230 else 10000000000
         u_data = {
             'id': user_id,
@@ -14,7 +17,8 @@ async def get_user_data(update):
             'balance': balance,
             'points': 0,
             'roulette_wins': 0,
-            'last_salary': 0
+            'last_salary': 0,
+            'last_gift': 0
         }
         db.insert(u_data)
     return u_data
