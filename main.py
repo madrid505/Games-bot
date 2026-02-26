@@ -6,6 +6,7 @@ from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
 db = TinyDB('bank_data.json')
 User = Query()
+logging.basicConfig(level=logging.INFO)
 
 async def get_u(uid, name):
     u = db.get(User.id == uid)
@@ -18,26 +19,24 @@ async def monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     
     chat_id = update.effective_chat.id
-    # حماية المجموعات المسموحة فقط
     if chat_id not in config.ALLOWED_GROUPS and update.effective_chat.type != "private":
         return
 
     text, uid, name = update.message.text.strip(), update.effective_user.id, update.effective_user.first_name
     u = await get_u(uid, name)
 
-    # رد "بوت"
     if text == "بوت":
         await update.message.reply_text(config.MSG_BOT_REPLY)
         return
 
-    # المستويات والخبرة
+    # المستويات
     new_xp = u.get('xp', 0) + 1
     if new_xp >= u['level'] * 50:
         db.update({'level': u['level']+1, 'xp': 0}, User.id == uid)
-        await update.message.reply_text(f"🆙 كفو {name}! وصلت مستوى {u['level']+1}\nلقبك: {config.get_rank_name(u['level']+1)}")
+        await update.message.reply_text(f"🆙 كفو {name}! مستوى {u['level']+1}\nلقبك: {config.get_rank_name(u['level']+1)}")
     db.update({'xp': new_xp, 'points': u.get('points',0)+1}, User.id == uid)
 
-    # أوامر البنك الكاملة
+    # أوامر البنك
     if text == "رصيدي":
         await update.message.reply_text(f"👤 {name}\n📈 لفل: {u['level']}\n💰 رصيدك: {u['balance']:,}")
     elif text == "راتب":
@@ -59,35 +58,40 @@ async def monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else: await update.message.reply_text("❌ رصيدك غير كافٍ!")
         except: pass
 
-    # الروليت (صلاحية المشرفين فقط)
+    # الروليت (المصلح)
     elif text == "روليت":
-        stat = await context.bot.get_chat_member(chat_id, uid)
-        if uid == config.OWNER_ID or stat.status in ['creator', 'administrator']:
-            context.chat_data['r_on'], context.chat_data['r_p'], context.chat_data['r_s'] = True, [], uid
-            await update.message.reply_text(royal.MSG_ROULETTE_START)
-        else: await update.message.reply_text("⚠️ الروليت للمدراء فقط!")
+        try:
+            stat = await context.bot.get_chat_member(chat_id, uid)
+            if uid == config.OWNER_ID or stat.status in ['creator', 'administrator']:
+                context.chat_data['r_on'], context.chat_data['r_p'], context.chat_data['r_s'] = True, [], uid
+                await update.message.reply_text(royal.MSG_ROULETTE_START)
+            else: await update.message.reply_text("⚠️ الروليت للمدراء فقط!")
+        except: pass
 
     elif text == "انا" and context.chat_data.get('r_on'):
-        context.chat_data['r_p'].append({'id': uid, 'name': name})
-        await update.message.reply_text(royal.MSG_ROULETTE_JOIN)
+        if not any(p['id'] == uid for p in context.chat_data['r_p']):
+            context.chat_data['r_p'].append({'id': uid, 'name': name})
+            await update.message.reply_text(royal.MSG_ROULETTE_JOIN)
+            
     elif text == "تم" and context.chat_data.get('r_on'):
-        if uid == context.chat_data['r_s'] or uid == config.OWNER_ID:
+        if uid == context.chat_data.get('r_s') or uid == config.OWNER_ID:
             res = await royal.process_roulette_winner(context.chat_data['r_p'])
             if res:
                 await update.message.reply_text(royal.MSG_ROULETTE_WIN.format(name=res['name'], wins=res['wins']))
                 if res['is_king']: await update.message.reply_text(royal.MSG_ROULETTE_KING.format(name=res['name'], wins=res['wins']))
             context.chat_data['r_on'] = False
 
-    # ملك التفاعل
     elif text == "ملك التفاعل":
         await update.message.reply_text(await royal.get_top_active())
 
-    # تشغيل الألعاب (نص + زر)
+    # الألعاب
     clean = text.replace("لعبة ", "")
     if clean in games.ALL_QUESTIONS or clean in ["تخمين", "صيد"]:
-        q, a = await games.get_game_data(clean) if clean in games.ALL_QUESTIONS else (None, None)
-        if clean == "تخمين": q, a = "🎲 خمن رقم (1-10)", str(random.randint(1, 10))
-        if clean == "صيد": a = str(random.randint(1000, 9999)); q = f"🎯 اكتب الرقم: `{a}`"
+        if clean in games.ALL_QUESTIONS:
+            q, a = await games.get_game_data(clean)
+        elif clean == "تخمين": q, a = "🎲 خمن رقم (1-10)", str(random.randint(1, 10))
+        elif clean == "صيد": a = str(random.randint(1000, 9999)); q = f"🎯 اكتب الرقم: `{a}`"
+        
         if q:
             context.chat_data['ans'] = a
             await update.message.reply_text(f"🎮 بدأت {clean}:\n{q}")
