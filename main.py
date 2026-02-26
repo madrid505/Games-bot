@@ -1,21 +1,16 @@
-import asyncio
-from telegram.ext import Application
-from core.security import check_allowed_group
-from core.permissions import is_owner_or_admin
-from games.quiz import QuizGame
-from roulette.roulette import RouletteGame
-from bank.bank import BankSystem
-from config import BOT_TOKEN
+import logging
+from telegram.ext import Application, MessageHandler, CallbackQueryHandler, filters
+from handlers import register_handlers
 
-async def main():
+# إعداد السجلات
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+BOT_TOKEN = "8613134391:AAEfV8sqV7_Kh5g9KG5xT8S9mwl0eqVxFBI"
+
+def main():
     app = Application.builder().token(BOT_TOKEN).build()
+    register_handlers(app)
+    app.run_polling()
 
-    # إضافة Handlers
-    QuizGame.register_handlers(app)
-    RouletteGame.register_handlers(app)
-    BankSystem.register_handlers(app)
-
-    await app.run_polling()
-
-if __name__ == '__main__':
-    asyncio.run(main())
+if __name__ == "__main__":
+    main()
