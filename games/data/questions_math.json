@@ -1,0 +1,12 @@
+[
+  {"question": "5 + 5 * 2", "answer": "15"},
+  {"question": "100 / 4", "answer": "25"},
+  {"question": "9 * 9", "answer": "81"},
+  {"question": "12 * 12", "answer": "144"},
+  {"question": "144 / 12", "answer": "12"},
+  {"question": "7 * 8", "answer": "56"},
+  {"question": "49 / 7", "answer": "7"},
+  {"question": "15 + 6", "answer": "21"},
+  {"question": "18 - 7", "answer": "11"},
+  {"question": "9 + 10", "answer": "19"}
+]
