@@ -1,35 +1,24 @@
-import logging
 import asyncio
-import sys
 from telegram.ext import Application, MessageHandler, CallbackQueryHandler, filters
-from handlers.games_handler import handle_messages, callback_handler
+from handlers.bank_handler import bank_logic
+from handlers.roulette_handler import roulette_logic
+from handlers.interaction_handler import interaction_logic
+from handlers.games_handler import handle_messages, callback_handler # ملف الألعاب الأصلي
 from config import BOT_TOKEN
 
-# إعداد السجلات
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-
 async def run_bot():
-    try:
-        app = Application.builder().token(BOT_TOKEN).build()
-        
-        # إضافة المعالجات (التأكد من رتبة الفلاتر)
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
-        app.add_handler(CallbackQueryHandler(callback_handler))
+    app = Application.builder().token(BOT_TOKEN).build()
+    
+    # الترتيب هنا حيوي جداً لضمان عدم ضياع أي رسالة
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, interaction_logic), group=1)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bank_logic), group=2)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, roulette_logic), group=3)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages), group=4)
+    
+    app.add_handler(CallbackQueryHandler(callback_handler))
 
-        print("✅ تم تشغيل بوت مونوبولي الملكي بنجاح...")
-        
-        async with app:
-            await app.initialize()
-            await app.start()
-            await app.updater.start_polling()
-            # إبقاء البوت يعمل للأبد
-            while True:
-                await asyncio.sleep(3600)
-    except Exception as e:
-        print(f"❌ خطأ فادح في التشغيل: {e}")
+    print("✅ تم تشغيل نظام مونوبولي المطور بنجاح...")
+    await app.run_polling()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(run_bot())
-    except (KeyboardInterrupt, SystemExit):
-        print("🛑 تم إيقاف البوت.")
+    asyncio.run(run_bot())
