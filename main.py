@@ -98,9 +98,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.update({'balance': u_data['balance'] + 10000000}, User.id == user_id)
         await update.message.reply_text(f"✅ كفو {user_name}! إجابة صح وفزت بـ 10,000,000 ريال!")
 
-    # --- [3] الروليت (الرسائل الملكية الأصلية + إصلاح الخطأ) ---
+    # --- [3] الروليت (الرسائل الملكية الأصلية + إصلاح شامل) ---
     elif text == "روليت":
-        context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], user_id
+        context.chat_data['r_on'] = True
+        context.chat_data['r_players'] = []
+        context.chat_data['r_starter'] = user_id
         await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
 
     elif text == "انا" and context.chat_data.get('r_on'):
@@ -115,8 +117,6 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 w_id = winner_raw['id']
                 w_db = db.get(User.id == w_id)
                 new_w = w_db.get('roulette_wins', 0) + 1
-                
-                # الإصلاح هنا: استخدام == بدلاً من =
                 db.update({'roulette_wins': new_w}, User.id == w_id)
                 
                 await update.message.reply_text(f"👑👑 مبااااارك عليك الفوز يا اسطورة 👑👑\n\n          👑 \" {winner_raw['name']} \" 👑\n\n🏆 فوزك رقم: ( {new_w} )\n\n👈👈 استمر معنا بالمشاركة حتى تربح الجائزة الكبرى 👉👉")
@@ -131,10 +131,12 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         top = sorted(db.all(), key=lambda x: x.get('roulette_wins', 0), reverse=True)[:10]
         msg = "🏆 **قائمة أساطير الروليت:**\n\n"
         icons = ["1- 👑", "2- 🔥", "3- ♥️", "4- 🌟", "5- ✨", "6- 💎", "7- 🎖", "8- 🏅", "9- 🎗", "10- 🦾"]
+        found = False
         for i, u in enumerate(top):
             if u.get('roulette_wins', 0) > 0:
                 msg += f"{icons[i]} \" {u['name']} \" + ( {u['roulette_wins']} )\n"
-        await update.message.reply_text(msg if "1-" in msg else "لا توجد نقاط مسجلة بعد.")
+                found = True
+        await update.message.reply_text(msg if found else "لا توجد نقاط مسجلة بعد.")
 
     # --- [4] ملك التفاعل ---
     elif text == "ملك التفاعل":
@@ -154,4 +156,8 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
+    app.run_polling()
+
+if __name__ == '__main__':
+    main()
