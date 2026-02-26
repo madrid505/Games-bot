@@ -6,7 +6,6 @@ from telegram.ext import Application, ContextTypes, MessageHandler, CallbackQuer
 
 db = TinyDB('bank_data.json')
 User = Query()
-logging.basicConfig(level=logging.INFO)
 
 async def get_u(uid, name):
     u = db.get(User.id == uid)
@@ -15,14 +14,12 @@ async def get_u(uid, name):
         db.insert(u)
     return u
 
-# قائمة الألعاب (التي تظهر عند كتابة "العاب")
 def games_menu():
-    btns = [
-        [InlineKeyboardButton("🎮 أسئلة", callback_data="tab_q"), InlineKeyboardButton("🎲 حظ", callback_data="tab_l")],
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎮 أسئلة", callback_data="tab_q"), InlineKeyboardButton("🎲 مسابقات", callback_data="tab_m")],
         [InlineKeyboardButton("💰 بنك", callback_data="tab_b"), InlineKeyboardButton("🎰 روليت", callback_data="run_roulette")],
         [InlineKeyboardButton("👑 التفاعل", callback_data="run_top")]
-    ]
-    return InlineKeyboardMarkup(btns)
+    ])
 
 async def monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
@@ -32,45 +29,39 @@ async def monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text, uid, name = update.message.text.strip(), update.effective_user.id, update.effective_user.first_name
     u = await get_u(uid, name)
 
-    # 1. رد "بوت" و "العاب"
+    # رد "بوت" و "العاب"
     if text == "بوت":
-        await update.message.reply_text(config.MSG_BOT_REPLY)
-        return
+        await update.message.reply_text(config.MSG_BOT_REPLY); return
     elif text == "العاب":
-        await update.message.reply_text(f"🔱 قائمة ألعاب {config.OWNER_NAME} 🔱", reply_markup=games_menu())
-        return
+        await update.message.reply_text(f"🔱 ألعاب {config.OWNER_NAME} 🔱", reply_markup=games_menu()); return
 
-    # 2. أوامر البنك (الكاملة)
+    # أوامر البنك (حظ، استثمار، مضاربة، بخشيش، هدية)
+    bank_cmds = ["حظ", "استثمار", "مضاربة", "بخشيش", "زرف", "كنز"]
     if text == "رصيدي":
         await update.message.reply_text(f"👤 {name}\n📈 لفل: {u['level']}\n💰 رصيدك: {u['balance']:,}")
     elif text == "راتب":
         if time.time() - u.get('last_salary', 0) > 600:
-            amt = random.randint(5000000, 20000000)
-            db.update({'balance': u['balance']+amt, 'last_salary': time.time()}, User.id == uid)
-            await update.message.reply_text(f"💵 استلمت راتب: {amt:,}")
+            amt = random.randint(5000000, 20000000); db.update({'balance': u['balance']+amt, 'last_salary': time.time()}, User.id == uid)
+            await update.message.reply_text(f"💵 راتب: {amt:,}")
         else: await update.message.reply_text("⏳ الراتب كل 10 دقائق!")
-    elif text in ["زرف", "كنز", "حظ", "استثمار", "مضاربة", "بخشيش"]:
-        res = random.randint(-20000000, 50000000)
-        db.update({'balance': max(0, u['balance']+res)}, User.id == uid)
-        await update.message.reply_text(f"💰 نتيجة الـ {text}: {res:,} دينار")
+    elif text in bank_cmds:
+        res = random.randint(-15000000, 40000000); db.update({'balance': max(0, u['balance']+res)}, User.id == uid)
+        await update.message.reply_text(f"💰 {text}: {res:,} دينار")
     elif text.startswith("هدية "):
         try:
             val = int(text.split()[1])
             if u['balance'] >= val:
                 db.update({'balance': u['balance']-val}, User.id == uid)
-                await update.message.reply_text(f"🎁 تم إرسال هدية بقيمة {val:,} من رصيدك!")
+                await update.message.reply_text(f"🎁 تم خصم {val:,} لهديتك!")
             else: await update.message.reply_text("❌ رصيدك لا يكفي!")
         except: pass
 
-    # 3. الروليت (تم إلغاء شرط الازدواجية - يسمح بالتكرار)
+    # الروليت وملك التفاعل
     elif text == "روليت":
-        try:
-            stat = await context.bot.get_chat_member(chat_id, uid)
-            if uid == config.OWNER_ID or stat.status in ['creator', 'administrator']:
-                context.chat_data['r_on'], context.chat_data['r_p'], context.chat_data['r_s'] = True, [], uid
-                await update.message.reply_text(royal.MSG_ROULETTE_START)
-            else: await update.message.reply_text("⚠️ الروليت للمدراء فقط!")
-        except: pass
+        stat = await context.bot.get_chat_member(chat_id, uid)
+        if uid == config.OWNER_ID or stat.status in ['creator', 'administrator']:
+            context.chat_data['r_on'], context.chat_data['r_p'], context.chat_data['r_s'] = True, [], uid
+            await update.message.reply_text(royal.MSG_ROULETTE_START)
     elif text == "انا" and context.chat_data.get('r_on'):
         context.chat_data['r_p'].append({'id': uid, 'name': name})
         await update.message.reply_text(royal.MSG_ROULETTE_JOIN)
@@ -81,32 +72,38 @@ async def monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(royal.MSG_ROULETTE_WIN.format(name=res['name'], wins=res['wins']))
                 if res['is_king']: await update.message.reply_text(royal.MSG_ROULETTE_KING.format(name=res['name'], wins=res['wins']))
             context.chat_data['r_on'] = False
+    elif text == "ملك التفاعل":
+        await update.message.reply_text(await royal.get_top_active())
 
-    # 4. تشغيل الألعاب بالنص
+    # تشغيل الألعاب (نص)
     clean = text.replace("لعبة ", "")
-    if clean in games.ALL_QUESTIONS or clean in ["تخمين", "صيد"]:
-        q, a = await games.get_game_data(clean) if clean in games.ALL_QUESTIONS else (None, None)
-        if clean == "تخمين": q, a = "🎲 خمن رقم (1-10)", str(random.randint(1, 10))
-        if clean == "صيد": a = str(random.randint(1000, 9999)); q = f"🎯 اكتب الرقم: `{a}`"
-        if q: context.chat_data['ans'] = a; await update.message.reply_text(f"🎮 بدأت {clean}:\n{q}")
+    q, a = await games.get_game_data(clean)
+    if q:
+        if q == "WIN":
+            db.update({'balance': u['balance']+a}, User.id == uid)
+            await update.message.reply_text(f"✅ فزت في {clean} بربح {a:,}!")
+        elif q == "LOSE":
+            db.update({'balance': max(0, u['balance']-a)}, User.id == uid)
+            await update.message.reply_text(f"❌ خسرت في {clean} مبلغ {a:,}!")
+        else:
+            context.chat_data['ans'] = a; await update.message.reply_text(f"🎮 {clean}:\n{q}")
 
-    # 5. تحقق الإجابة
+    # تحقق الإجابة
     if context.chat_data.get('ans') and text.lower() == context.chat_data['ans'].lower():
-        context.chat_data['ans'] = None
-        db.update({'balance': u['balance'] + 10000000}, User.id == uid)
+        context.chat_data['ans'] = None; db.update({'balance': u['balance'] + 10000000}, User.id == uid)
         await update.message.reply_text(f"✅ كفو {name}! +10 مليون")
 
 async def cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query; await query.answer(); data = query.data
     if data == "tab_q":
-        btns = [[InlineKeyboardButton(k, callback_data=f"run_{k}") for k in list(games.ALL_QUESTIONS.keys())[i:i+2]] for i in range(0, len(games.ALL_QUESTIONS), 2)]
+        btns = [[InlineKeyboardButton(k, callback_data=f"run_{k}") for k in ["دين", "عواصم", "اندية"]]]
         await query.edit_message_text("🎮 اختر قسم الأسئلة:", reply_markup=InlineKeyboardMarkup(btns))
+    elif data == "tab_m":
+        btns = [[InlineKeyboardButton(k, callback_data=f"run_{k}") for k in ["تخمين", "صيد", "حرب العصابات", "السلم والحية", "المزاد"]]]
+        await query.edit_message_text("🎲 اختر مسابقة:", reply_markup=InlineKeyboardMarkup(btns))
     elif data.startswith("run_"):
-        key = data.split("_")[1]
-        q, a = await games.get_game_data(key)
+        key = data.split("_")[1]; q, a = await games.get_game_data(key)
         if q: context.chat_data['ans'] = a; await query.message.reply_text(f"🎮 {key}:\n{q}")
-    elif data == "run_roulette":
-        await query.message.reply_text("اكتب 'روليت' لبدء الجولة (للمدراء فقط)")
 
 def main():
     app = Application.builder().token(config.BOT_TOKEN).build()
