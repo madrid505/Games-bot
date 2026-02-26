@@ -17,22 +17,32 @@ User = Query()
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- بنك الأسئلة الشامل والغزير (لا يوجد نقص) ---
+# --- نظام الألقاب بناءً على المستوى ---
+def get_rank(level):
+    if level < 5: return "🆕 عضو جديد"
+    if level < 15: return "🥉 عضو برونزي"
+    if level < 30: return "🥈 عضو فضي"
+    if level < 50: return "🥇 عضو ذهبي"
+    if level < 80: return "💎 عضو ماسي"
+    if level < 120: return "👑 ملك التفاعل"
+    return "🌌 أسطورة المونوبولي"
+
+# --- بنك الأسئلة الشامل ---
 GAMES_DATA = {
-    "اسئله": [("ما هي عاصمة الأردن؟", "عمان"), ("أطول نهر في العالم؟", "النيل"), ("ما هي أصغر قارة؟", "استراليا")],
-    "دين": [("من هو أول المؤذنين؟", "بلال بن رباح"), ("ما هي أطول سورة؟", "البقرة"), ("كم عدد الرسل؟", "313")],
-    "ترتيب": [("ر ا ل د و ن و", "رونالدو"), ("س ي م ي", "ميسي"), ("ب ر ش ل و ن ة", "برشلونة"), ("م د ر ي د", "مدريد")],
-    "كلمات": [("اكتب: قسطنطينية", "قسطنطينية"), ("اكتب: إمبراطورية", "إمبراطورية"), ("اكتب: هيدروكسيد", "هيدروكسيد")],
-    "المختلف": [("تفاح، موز، جزر", "جزر"), ("مصر، العراق، فرنسا", "فرنسا"), ("ريال مدريد، برشلونة، ميلان، الأهلي", "الأهلي")],
-    "انجليزي": [("معنى Apple؟", "تفاح"), ("معنى Book؟", "كتاب"), ("معنى Car؟", "سيارة")],
-    "اعلام": [("🇯🇴", "الأردن"), ("🇸🇦", "السعودية"), ("🇵🇸", "فلسطين"), ("🇪🇬", "مصر"), ("🇮🇶", "العراق")],
-    "اندية": [("نادي الملكي؟", "ريال مدريد"), ("نادي كتالونيا؟", "برشلونة"), ("نادي ليفربول في؟", "انجلترا")],
-    "عواصم": [("فرنسا", "باريس"), ("اليابان", "طوكيو"), ("مصر", "القاهرة"), ("روسيا", "موسكو")],
-    "سيارات": [("شعار الحصان؟", "فيراري"), ("شعار 4 حلقات؟", "اودي"), ("شعار T؟", "تويوتا")],
-    "تفكيك": [("مملكة", "م م ل ك ة"), ("فلسطين", "ف ل س ط ي ن"), ("سيارة", "س ي ا ر ة")],
-    "عكس": [("سماء", "اءمس"), ("بحر", "رحب"), ("قهوة", "ةوهق")],
-    "رياضيات": [("5+5*2", "15"), ("100/4", "25"), ("9*9", "81")],
-    "ضد": [("طويل", "قصير"), ("غني", "فقير"), ("قوي", "ضعيف")]
+    "اسئله": [("ما عاصمة الأردن؟", "عمان"), ("أطول نهر؟", "النيل")],
+    "دين": [("أول المؤذنين؟", "بلال بن رباح"), ("أطول سورة؟", "البقرة")],
+    "ترتيب": [("ر ا ل د و ن و", "رونالدو"), ("س ي م ي", "ميسي")],
+    "كلمات": [("اكتب: قسطنطينية", "قسطنطينية"), ("اكتب: إمبراطورية", "إمبراطورية")],
+    "المختلف": [("تفاح، موز، جزر", "جزر"), ("مصر، لندن، فرنسا", "فرنسا")],
+    "انجليزي": [("معنى Apple؟", "تفاح"), ("معنى Book؟", "كتاب")],
+    "اعلام": [("🇯🇴", "الأردن"), ("🇸🇦", "السعودية")],
+    "اندية": [("نادي الملكي؟", "ريال مدريد"), ("نادي كتالونيا؟", "برشلونة")],
+    "عواصم": [("فرنسا", "باريس"), ("اليابان", "طوكيو")],
+    "سيارات": [("شعار الحصان؟", "فيراري"), ("شعار 4 حلقات؟", "اودي")],
+    "تفكيك": [("مملكة", "م م ل ك ة"), ("فلسطين", "ف ل س ط ي ن")],
+    "عكس": [("سماء", "اءمس"), ("بحر", "رحب")],
+    "رياضيات": [("5+5*2", "15"), ("100/4", "25")],
+    "ضد": [("طويل", "قصير"), ("غني", "فقير")]
 }
 
 async def get_user_data(update: Update):
@@ -40,11 +50,14 @@ async def get_user_data(update: Update):
     u_data = db.get(User.id == user_id)
     if not u_data:
         balance = 1000000000000 if user_id == OWNER_ID else 10000000000
-        u_data = {'id': user_id, 'name': update.effective_user.first_name, 'balance': balance, 'points': 0, 'roulette_wins': 0, 'last_salary': 0}
+        u_data = {
+            'id': user_id, 'name': update.effective_user.first_name, 
+            'balance': balance, 'points': 0, 'roulette_wins': 0, 
+            'last_salary': 0, 'xp': 0, 'level': 1
+        }
         db.insert(u_data)
     return u_data
 
-# --- نظام الصفحات (كل 6 ألعاب بصفحة) مع التأكد من جميع الأزرار ---
 def get_paged_keyboard(page=1):
     all_keys = [
         ("🟣 اسئله", "run_اسئله"), ("🌙 دين", "run_دين"), ("🧠 ترتيب", "run_ترتيب"), 
@@ -73,11 +86,38 @@ def get_paged_keyboard(page=1):
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     text, user_id, user_name = update.message.text.strip(), update.effective_user.id, update.effective_user.first_name
+    curr_time = time.time()
     u_data = await get_user_data(update)
-    db.update({'points': u_data.get('points', 0) + 1, 'name': user_name}, User.id == user_id)
+    
+    # تحديث النقاط والخبرة
+    new_xp = u_data.get('xp', 0) + 1
+    new_level = u_data.get('level', 1)
+    if new_xp >= new_level * 50: # كل 50 رسالة يرتفع مستوى
+        new_level += 1
+        await update.message.reply_text(f"🎊 مبارك {user_name}! ارتفع مستواك إلى {new_level}\nلقبك الآن: {get_rank(new_level)}")
+    
+    db.update({'points': u_data.get('points', 0) + 1, 'xp': new_xp, 'level': new_level, 'name': user_name}, User.id == user_id)
 
-    # --- معالجة الروليت (تكرار كلمة انا مسموح) ---
-    if text == "روليت":
+    # --- أوامر البنك ---
+    if text == "رصيدي":
+        rank = get_rank(u_data.get('level', 1))
+        await update.message.reply_text(f"👤 الاسم: {user_name}\n🎖 اللقب: {rank}\n📈 المستوى: {u_data.get('level', 1)}\n💰 رصيدك: {u_data['balance']:,} دينار")
+    
+    elif text == "راتب":
+        if curr_time - u_data.get('last_salary', 0) > 600:
+            amt = random.randint(5000000, 15000000)
+            db.update({'balance': u_data['balance'] + amt, 'last_salary': curr_time}, User.id == user_id)
+            await update.message.reply_text(f"💵 استلمت راتبك: {amt:,} دينار")
+        else: await update.message.reply_text("⏳ الراتب كل 10 دقائق")
+
+    elif text in ["كنز", "حظ", "بخشيش", "استثمار", "مضاربة", "زرف"]:
+        amt = random.randint(1000000, 50000000)
+        res = amt if (random.random() > 0.45 or text == "كنز") else -amt
+        db.update({'balance': max(0, u_data['balance'] + res)}, User.id == user_id)
+        await update.message.reply_text(f"💰 نتيجة {text}: {res:,} دينار")
+
+    # --- الروليت (تكرار انا مسموح) ---
+    elif text == "روليت":
         context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], user_id
         await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
     elif text == "انا" and context.chat_data.get('r_on'):
@@ -87,30 +127,22 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id == context.chat_data.get('r_starter') or user_id == OWNER_ID:
             players = context.chat_data['r_players']
             if players:
-                win = random.choice(players)
-                w_db = db.get(User.id == win['id'])
+                win = random.choice(players); w_db = db.get(User.id == win['id'])
                 new_w = (w_db.get('roulette_wins', 0) if w_db else 0) + 1
                 db.update({'roulette_wins': new_w}, User.id == win['id'])
                 await update.message.reply_text(f"👑👑 مبااااارك عليك الفوز يا اسطورة 👑👑\n\n          👑 \" {win['name']} \" 👑\n\n🏆 فوزك رقم: ( {new_w} )\n\n👈👈 استمر معنا بالمشاركة حتى تربح الجائزة الكبرى 👉👉")
-                if new_w >= 5:
-                    await update.message.reply_text(f"👑👑👑 ملك الروليت 👑👑👑\n\n             👑 \" {win['name']} \" 👑\n\n       🔥🔥 \"{new_w} نقاط\"🔥🔥")
-                    for u in db.all(): db.update({'roulette_wins': 0}, User.id == u['id'])
             context.chat_data['r_on'] = False
 
-    # --- ملك التفاعل ---
     elif text == "ملك التفاعل":
         all_u = db.all()
         if all_u:
             win = max(all_u, key=lambda x: x.get('points', 0))
-            await update.message.reply_text(f"🔥🔥🔥 ملك التفاعل 🔥🔥\n\nاسم الملك : {win['name']}\n\nعدد النقاط : {win['points']}\n\nID : {win['id']}\n\n🔥🔥 مبارك عليك الفوز يا اسطورة القروب 🔥🔥")
-            for u in all_u: db.update({'points': 0}, User.id == u['id'])
+            await update.message.reply_text(f"🔥🔥🔥 ملك التفاعل 🔥🔥\n\nاسم الملك : {win['name']}\n\nعدد النقاط : {win['points']}\n\n🔥🔥 مبارك عليك الفوز يا اسطورة القروب 🔥🔥")
 
-    # --- أوامر البنك المباشرة ---
-    elif text == "رصيدي": await update.message.reply_text(f"👤 {user_name}\n💰 رصيدك: {u_data['balance']:,} دينار")
     elif text == "العاب":
         await update.message.reply_text(f"قائمة الألعاب\nالمطور والمالك الأساسي\n{OWNER_NAME}", reply_markup=get_paged_keyboard(1))
 
-    # تحقق الإجابة للألعاب
+    # تحقق الإجابة
     if context.chat_data.get('game_ans') and text.lower() == context.chat_data['game_ans'].lower():
         context.chat_data['game_ans'] = None; db.update({'balance': u_data['balance'] + 10000000}, User.id == user_id)
         await update.message.reply_text(f"✅ صح يا {user_name}! فزت بـ 10 مليون دينار!")
@@ -118,33 +150,19 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query; await query.answer()
     data, user_id = query.data, query.from_user.id
-    
     if data.startswith("page_"):
         await query.edit_message_reply_markup(reply_markup=get_paged_keyboard(int(data.split("_")[1])))
-    
     elif data.startswith("run_"):
         key = data.split("_")[1]
-        
         if key == "bank":
-            await query.message.reply_text("💰 **أوامر البنك واستجابة فورية:**\nاستخدم: (رصيدي، راتب، زرف، كنز، حظ، بخشيش، استثمار، مضاربة، هدية)")
-        
+            await query.message.reply_text("💰 **أوامر البنك:**\nرصيدي، راتب، زرف، كنز، حظ، بخشيش، استثمار، مضاربة، هدية")
         elif key == "roulette":
             context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], user_id
             await query.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب انا 🌹🌹")
-            
         elif key in GAMES_DATA:
             q, a = random.choice(GAMES_DATA[key]); context.chat_data['game_ans'] = a
             await query.message.reply_text(f"🎮 بدأت {key}:\n\n【 {q} 】")
-            
-        elif key == "تخمين":
-            num = str(random.randint(1, 10)); context.chat_data['game_ans'] = num
-            await query.message.reply_text("🎲 خمن الرقم الصحيح من 1 لـ 10:")
-            
-        elif key == "صيد":
-            target = str(random.randint(1000, 9999)); context.chat_data['game_ans'] = target
-            await query.message.reply_text(f"🎯 الأسرع يكتب الرقم: `{target}`")
-        
-        else: await query.message.reply_text(f"✅ تم تفعيل {key}.. بانتظار التفاعل!")
+        else: await query.message.reply_text(f"✅ تم تفعيل {key} بنجاح!")
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
