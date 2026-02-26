@@ -12,9 +12,9 @@ MSG_ROULETTE_KING = "👑👑👑 ملك الروليت 👑👑👑\n\n        
 
 async def get_top_active():
     all_users = db.all()
-    if not all_users: return "لا يوجد بيانات."
+    if not all_users: return "لا يوجد بيانات حالياً."
     top = max(all_users, key=lambda x: x.get('points', 0))
-    return f"🔥🔥🔥 ملك التفاعل 🔥🔥\n\nاسم الملك : {top['name']}\n\nنقاطه : {top['points']}\n\n🏆 مباارك يا أسطورة!"
+    return f"🔥🔥🔥 ملك التفاعل 🔥🔥\n\nاسم الملك : {top['name']}\n\nنقاطه : {top['points']}\n\n🏆 مباارك عليك يا إمبراطور!"
 
 async def process_roulette_winner(players):
     if not players: return None
