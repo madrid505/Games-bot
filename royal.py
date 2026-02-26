@@ -1,7 +1,6 @@
 # royal.py
 import random
 from tinydb import TinyDB, Query
-import config
 
 db = TinyDB('bank_data.json')
 User = Query()
@@ -13,17 +12,6 @@ MSG_ROULETTE_KING = "👑👑👑 ملك الروليت 👑👑👑\n\n        
 
 async def get_top_active():
     all_users = db.all()
-    if not all_users: return "لا يوجد بيانات بعد."
+    if not all_users: return "لا يوجد بيانات."
     top = max(all_users, key=lambda x: x.get('points', 0))
-    return f"🔥🔥🔥 ملك التفاعل 🔥🔥\n\nاسم الملك : {top['name']}\n\nعدد النقاط : {top['points']}\n\n🔥🔥 مبارك عليك الفوز يا اسطورة القروب 🔥🔥"
-
-async def process_roulette_winner(players):
-    if not players: return None
-    winner = random.choice(players)
-    u_db = db.get(User.id == winner['id'])
-    new_wins = (u_db.get('roulette_wins', 0) if u_db else 0) + 1
-    db.update({'roulette_wins': new_wins}, User.id == winner['id'])
-    res = {"name": winner['name'], "wins": new_wins, "is_king": (new_wins >= 5)}
-    if res["is_king"]:
-        for u in db.all(): db.update({'roulette_wins': 0}, User.id == u['id'])
-    return res
+    return f"🔥🔥🔥 ملك التفاعل 🔥🔥\n\nاسم الملك : {top['name']}\n\nنقاطه : {top['points']}\n\n🏆 مباارك يا أسطورة!"
