@@ -1,31 +1,27 @@
 import logging
-from telegram.ext import Application
-from handlers import register_handlers
+from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters
 from config import BOT_TOKEN
+from handlers import handle_messages, callback_handler
 
-# إعداد السجلات (Logs) لمراقبة عمل البوت
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
-    level=logging.INFO
-)
+# إعداد السجلات
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 def main():
-    """تشغيل بوت مونوبولي الملكي"""
     try:
-        # بناء تطبيق البوت باستخدام التوكن
-        app = Application.builder().token(BOT_TOKEN).build()
-        
-        # استدعاء دالة تسجيل المعالجات من مجلد handlers
-        register_handlers(app)
+        # بناء التطبيق
+        app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+        # إضافة المعالجات
+        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
+        app.add_handler(CallbackQueryHandler(callback_handler))
 
         print("✅ تم تشغيل نظام مونوبولي الملكي بنجاح...")
         
-        # تشغيل البوت بنمط Polling (الأكثر استقراراً)
-        # drop_pending_updates تضمن تجاهل الرسائل القديمة عند إعادة التشغيل
+        # التشغيل بنظام Polling المستقر
         app.run_polling(drop_pending_updates=True)
         
     except Exception as e:
-        print(f"❌ حدث خطأ فادح أثناء التشغيل: {e}")
+        print(f"❌ حدث خطأ في التشغيل: {e}")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
