@@ -31,16 +31,15 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
 
-    # 1. تحديث ملك التفاعل + رسالة التهنئة التلقائية
+    # 1. تحديث ملك التفاعل في الخلفية
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    if current_msgs >= 1000:
-        await update.message.reply_text(f"🔥🔥🔥 **ملك التفاعل** 🔥🔥\n\nاسم الملك : {u_name}\nعدد النقاط : {u_data.get('points', 0)}\nعدد المشاركات : {current_msgs}\n\n🔥🔥 مبارك الفوز يا اسطورة القروب 🔥🔥")
-        db.update({'msg_count': 0}, User.id == u_id)
+    # 2. إرسال الأوامر للبنك (زرف، هدية، راتب) لضمان السرعة
+    if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
-    # 2. أمر عرض قائمة ملك التفاعل (TOP 10)
+    # 3. عرض ملك التفاعل والتهنئة
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -51,9 +50,9 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg)
         return
 
-    # 3. تمرير الرسالة للبنك
-    if await handle_bank(update, u_data, text, u_name, u_id):
-        return
+    if current_msgs >= 1000:
+        await update.message.reply_text(f"🔥🔥🔥 **ملك التفاعل** 🔥🔥\n\nاسم الملك : {u_name}\nعدد النقاط : {u_data.get('points', 0)}\nعدد المشاركات : {current_msgs}\n\n🔥🔥 مبارك الفوز يا اسطورة القروب 🔥🔥")
+        db.update({'msg_count': 0}, User.id == u_id)
 
     # 4. نظام الروليت الملكي
     if text == "روليت":
@@ -64,9 +63,10 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "انا" and context.chat_data.get('r_on'):
+        # يسجل اللاعب إذا لم يكن مسجلاً، لكن يرسل الرسالة في كل مرة (تكرار)
         if not any(p['id'] == u_id for p in context.chat_data.get('r_players', [])):
             context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
-            await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
+        await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
         return
 
     if text == "تم" and context.chat_data.get('r_on') and u_id == context.chat_data['r_starter']:
@@ -108,7 +108,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['game_ans'] = None
         return
 
-    # 7. الأوامر العامة
+    # 7. قائمة الأوامر
     if text in ["قائمة", "الاوامر", "الأوامر"]:
         await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑", reply_markup=get_main_menu_keyboard())
         return
