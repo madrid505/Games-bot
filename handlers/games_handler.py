@@ -7,6 +7,7 @@ from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
 
+# تحميل الأسئلة والألعاب
 QUESTIONS = load_questions()
 
 def get_main_menu_keyboard():
@@ -31,11 +32,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
 
-    # 1. تحديث ملك التفاعل (صامت أولاً)
+    # 1. تحديث عداد ملك التفاعل
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    # 2. أوامر ملك التفاعل
+    # 2. أوامر ملك التفاعل (عرض القائمة)
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -50,7 +51,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"🔥🔥🔥 **ملك التفاعل** 🔥🔥\n\nاسم الملك : {u_name}\nعدد النقاط : {u_data.get('points', 0)}\nعدد المشاركات : {current_msgs}\n\n🔥🔥 مبارك الفوز يا اسطورة القروب 🔥🔥")
         db.update({'msg_count': 0}, User.id == u_id)
 
-    # 3. تمرير الرسالة لملف البنك (إذا كانت أمر بنك سيتوقف هنا)
+    # 3. تمرير الرسالة لملف البنك (إصلاح أوامر حظ، استثمار، كنز، إلخ)
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
@@ -83,29 +84,56 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['r_on'] = False
         return
 
-    # 5. الأوامر وقائمة الألعاب
+    # 5. التحقق من الإجابة إذا كانت هناك لعبة جارية
+    correct_ans = context.chat_data.get('game_ans')
+    if correct_ans and text == correct_ans:
+        db.update({'balance': u_data['balance'] + 50000, 'points': u_data['points'] + 1}, User.id == u_id)
+        await update.message.reply_text(f"✅ **إجابة صحيحة!** {u_name}\n💰 ربحت 50,000 دينار ونقطة تفاعل.")
+        context.chat_data['game_ans'] = None
+        return
+
+    # 6. تشغيل اللعبة عن طريق كتابة اسمها (مثل: إسلاميات، سيارات، إلخ)
+    game_key = None
+    # نبحث عن الكلمة في مفاتيح الألعاب
+    for key in QUESTIONS.keys():
+        if text == key:
+            game_key = key
+            break
+    
+    if game_key:
+        q = random.choice(QUESTIONS[game_key])
+        context.chat_data['game_ans'] = q['answer']
+        caption = f"🎮 **بدأت لعبة {game_key}**\n\n━━━━━━━━━━━━━\n【 {q['question']} 】\n━━━━━━━━━━━━━"
+        if q.get('image') and os.path.exists(q['image']):
+            await update.message.reply_photo(photo=open(q['image'], 'rb'), caption=caption)
+        else:
+            await update.message.reply_text(caption)
+        return
+
+    # 7. الأوامر وقائمة الألعاب
     if text in ["قائمة", "الاوامر", "الأوامر"]:
         await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑", reply_markup=get_main_menu_keyboard())
         return
 
-    correct_ans = context.chat_data.get('game_ans')
-    if correct_ans and text == correct_ans:
-        db.update({'balance': u_data['balance'] + 50000, 'points': u_data['points'] + 1}, User.id == u_id)
-        await update.message.reply_text(f"✅ **صح!** {u_name} فزت بـ 50,000 دينار.")
-        context.chat_data['game_ans'] = None
-        return
-
-    if text in QUESTIONS:
-        q = random.choice(QUESTIONS[text])
-        context.chat_data['game_ans'] = q['answer']
-        await update.message.reply_text(f"🎮 **{text}**:\n【 {q['question']} 】")
-
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    
+    # التعامل مع أزرار الألعاب
     if query.data.startswith("run_"):
         game = query.data.replace("run_", "")
         if game in QUESTIONS:
             q = random.choice(QUESTIONS[game])
             context.chat_data['game_ans'] = q['answer']
-            await query.message.reply_text(f"🎮 **بدأت {game}**:\n【 {q['question']} 】")
+            caption = f"🎮 **بدأت لعبة {game}**\n\n【 {q['question']} 】"
+            await query.message.reply_text(caption)
+    
+    # التعامل مع أزرار الرصيد والتوب في القائمة
+    elif query.data == "cmd_balance":
+        u = db.get(User.id == query.from_user.id)
+        await query.message.reply_text(f"💰 **رصيدك الملكي:** {u['balance']:,} دينار.")
+    elif query.data == "cmd_top":
+        top = sorted(db.all(), key=lambda x: x.get('balance', 0), reverse=True)[:10]
+        msg = "🏆 **قائمة الهوامير:**\n"
+        for i, user in enumerate(top, 1): msg += f"{i} - {user['name']} ({user['balance']:,} د)\n"
+        await query.message.reply_text(msg)
