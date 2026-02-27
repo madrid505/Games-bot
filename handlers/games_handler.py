@@ -31,11 +31,16 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
 
-    # 1. تحديث ملك التفاعل
+    # 1. تحديث ملك التفاعل + رسالة التهنئة التلقائية
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    # 2. أوامر ملك التفاعل
+    if current_msgs >= 1000:
+        await update.message.reply_text(f"🔥🔥🔥 **ملك التفاعل** 🔥🔥\n\nاسم الملك : {u_name}\nعدد النقاط : {u_data.get('points', 0)}\nعدد المشاركات : {current_msgs}\n\n🔥🔥 مبارك الفوز يا اسطورة القروب 🔥🔥")
+        db.update({'msg_count': 0}, User.id == u_id)
+        return
+
+    # 2. أمر عرض قائمة ملك التفاعل (TOP 10)
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -46,11 +51,40 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg)
         return
 
-    # 3. تمرير الرسالة للبنك (بدون أي تعديل على أوامره)
+    # 3. تمرير الرسالة للبنك
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
-    # 4. تفعيل تشغيل الألعاب بالنص (الحل المطلوب)
+    # 4. نظام الروليت الملكي
+    if text == "روليت":
+        admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
+        if u_id == OWNER_ID or u_id in admins:
+            context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], u_id
+            await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب 'انا' 🌹🌹")
+        return
+
+    if text == "انا" and context.chat_data.get('r_on'):
+        if not any(p['id'] == u_id for p in context.chat_data.get('r_players', [])):
+            context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
+            await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
+        return
+
+    if text == "تم" and context.chat_data.get('r_on') and u_id == context.chat_data['r_starter']:
+        players = context.chat_data.get('r_players', [])
+        if players:
+            win = random.choice(players)
+            w_db = db.get(User.id == win['id'])
+            new_wins = (w_db.get('roulette_wins', 0) if w_db else 0) + 1
+            db.update({'roulette_wins': new_wins}, User.id == win['id'])
+            if new_wins >= 5:
+                await update.message.reply_text(f"✨✨✨✨✨✨✨✨✨✨✨✨\n👑👑 **ملك الروليت الأسطوري** 👑👑\n\n👑 「 {win['name']} 」 👑\n\nلقب **ملك الروليت** بـ 5 انتصارات أسطورية!\n✨✨✨✨✨✨✨✨✨✨✨✨")
+                db.update({'roulette_wins': 0}, User.id == win['id'])
+            else:
+                await update.message.reply_text(f"👑👑 مبااااارك الفوز يا اسطورة الروليت 👑👑\n\n👑 \" {win['name']} \" 👑\n🏆 فوزك رقم: ( {new_wins} )")
+        context.chat_data['r_on'] = False
+        return
+
+    # 5. تشغيل الألعاب بالنص
     game_map = {
         "إسلاميات": "islamic", "ثقافة عامة": "general", "سيارات": "cars", 
         "أندية": "clubs", "عواصم": "countries", "أعلام": "flags", 
@@ -66,7 +100,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"🎮 **بدأت {text}**:\n【 {q['question']} 】")
             return
 
-    # 5. التحقق من الإجابة
+    # 6. التحقق من الإجابة
     correct_ans = context.chat_data.get('game_ans')
     if correct_ans and text == str(correct_ans):
         db.update({'balance': u_data['balance'] + 50000, 'points': u_data['points'] + 1}, User.id == u_id)
@@ -74,14 +108,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['game_ans'] = None
         return
 
-    # 6. الروليت وبقية الأوامر
-    if text == "روليت":
-        admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
-        if u_id == OWNER_ID or u_id in admins:
-            context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], u_id
-            await update.message.reply_text("🔥🔥 لقد بدأت لعبة الروليت 🔥🔥\n\nاكتب 'انا' للاشتراك.")
-        return
-
+    # 7. الأوامر العامة
     if text in ["قائمة", "الاوامر", "الأوامر"]:
         await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑", reply_markup=get_main_menu_keyboard())
         return
@@ -95,4 +122,4 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if game in QUESTIONS:
             q = random.choice(QUESTIONS[game])
             context.chat_data['game_ans'] = q['answer']
-            await query.message.reply_text(f"🎮 **بدأت اللعبة**:\n【 {q['question']} 】")
+            await query.message.reply_text(f"🎮 **بدأت {game}**:\n【 {q['question']} 】")
