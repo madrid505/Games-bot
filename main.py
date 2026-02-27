@@ -3,11 +3,11 @@ import config
 from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters
 from handlers.games_handler import handle_messages, callback_handler
 
-# إعداد السجلات (للمراقبة في Northflank)
+# إعداد السجلات لمراقبة البوت في Northflank
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 def main():
-    # تعديل جلب التوكن ليطابق ملف config الخاص بك
+    # استخدام BOT_TOKEN كما هو في ملف config.py الخاص بك
     bot_token = config.BOT_TOKEN 
     
     if not bot_token:
@@ -16,13 +16,13 @@ def main():
 
     application = ApplicationBuilder().token(bot_token).build()
 
-    # 1. تفعيل الأزرار (هذا ما كان ينقصك لتشغيل أزرار القائمة)
+    # [حل مشكلة الأزرار]: هذا السطر هو المسؤول عن جعل الأزرار تستجيب عند الضغط
     application.add_handler(CallbackQueryHandler(callback_handler))
 
-    # 2. تفعيل النصوص (لتشغيل الألعاب بالكتابة + أوامر البنك + الروليت)
+    # [حل مشكلة نصوص الألعاب وملك التفاعل]: هذا السطر يوجه كل نص إلى الدالة المسؤولة
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
 
-    print("👑 نظام مونوبولي الملكي استعد للعمل...")
+    print("👑 نظام مونوبولي الملكي يعمل بكامل طاقته الآن...")
     application.run_polling()
 
 if __name__ == '__main__':
