@@ -10,7 +10,7 @@ def get_main_menu_keyboard():
     keyboard = [
         [InlineKeyboardButton("🕋 إسلاميات", callback_data="game_إسلاميات"), InlineKeyboardButton("💡 ثقافة عامة", callback_data="game_ثقافة عامة")],
         [InlineKeyboardButton("🌍 عواصم", callback_data="game_عواصم"), InlineKeyboardButton("🚩 أعلام", callback_data="game_أعلام")],
-        [InlineKeyboardButton("💰 الرصيد", callback_data="menu_balance")]
+        [InlineKeyboardButton("💰 الرصيد", callback_data="menu_balance"), InlineKeyboardButton("🏆 الهوامير", callback_data="menu_top")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -27,7 +27,7 @@ async def handle_game_logic(update, context, text):
     if correct_ans and text == correct_ans:
         u_id = update.effective_user.id
         u_db = db.get(User.id == u_id)
-        db.update({'balance': u_db['balance'] + 50000}, User.id == u_id)
+        db.update({'balance': u_db.get('balance', 0) + 50000}, User.id == u_id)
         await update.message.reply_text(f"✅ إجابة صحيحة! ربحت 50,000 د.")
         context.chat_data['game_ans'] = None
         return True
@@ -38,6 +38,10 @@ async def callback_handler(update, context):
     await query.answer()
     if query.data.startswith("game_"):
         game_type = query.data.replace("game_", "")
-        q = random.choice(QUESTIONS[game_type])
-        context.chat_data['game_ans'] = q['answer']
-        await query.message.reply_text(GAME_MESSAGES["game_start"].format(game_name=game_type, question=q['question']))
+        if game_type in QUESTIONS:
+            q = random.choice(QUESTIONS[game_type])
+            context.chat_data['game_ans'] = q['answer']
+            await query.message.reply_text(GAME_MESSAGES["game_start"].format(game_name=game_type, question=q['question']))
+    elif query.data == "menu_balance":
+        u = db.get(User.id == query.from_user.id)
+        await query.message.reply_text(f"💰 رصيدك: {u.get('balance', 0):,} د.")
