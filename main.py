@@ -3,26 +3,23 @@ import config
 from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters
 from handlers.games_handler import handle_messages, callback_handler
 
-# إعداد السجلات لمراقبة البوت في Northflank
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 def main():
-    # استخدام BOT_TOKEN كما هو في ملف config.py الخاص بك
     bot_token = config.BOT_TOKEN 
-    
     if not bot_token:
-        print("❌ خطأ: لم يتم العثور على BOT_TOKEN في ملف config.py")
         return
 
     application = ApplicationBuilder().token(bot_token).build()
 
-    # [حل مشكلة الأزرار]: هذا السطر هو المسؤول عن جعل الأزرار تستجيب عند الضغط
+    # الأزرار أولاً لضمان الاستجابة السريعة
     application.add_handler(CallbackQueryHandler(callback_handler))
 
-    # [حل مشكلة نصوص الألعاب وملك التفاعل]: هذا السطر يوجه كل نص إلى الدالة المسؤولة
+    # النصوص ثانياً (تشمل الألعاب، البنك، وملك التفاعل)
+    # ملاحظة: handle_messages يجب أن تكون هي المعالج الرئيسي الوحيد للنصوص
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
 
-    print("👑 نظام مونوبولي الملكي يعمل بكامل طاقته الآن...")
+    print("🚀 تم تشغيل المحرك الملكي بنجاح...")
     application.run_polling()
 
 if __name__ == '__main__':
