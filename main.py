@@ -1,40 +1,35 @@
 import logging
-import config
+import asyncio
 from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters
-from db import get_user_data, db, User
-import handlers.roulette_handler as roulette
-import handlers.games_handler as games
-import handlers.bank_handler as bank
+from config import BOT_TOKEN
+from handlers import handle_messages, callback_handler
 
-logging.basicConfig(level=logging.INFO)
-
-async def global_handler(update, context):
-    if not update.message or not update.message.text: return
-    text = update.message.text.strip()
-    u_id = update.effective_user.id
-    u_name = update.effective_user.first_name
-
-    # ⭐ ملك التفاعل (مدمج لضمان العمل)
-    u_data = await get_user_data(update)
-    db.update({'msg_count': u_data.get('msg_count', 0) + 1}, User.id == u_id)
-
-    # 1. الروليت
-    if await roulette.handle_roulette(update, context, text, u_id, u_name): return
-    # 2. البنك (نسخة Anas: راتب 30 د، ضريبة Anas، حظ عشوائي)
-    if await bank.handle_bank(update, context, text, u_name, u_id): return
-    # 3. الألعاب (نصوص + إجابات)
-    if await games.handle_game_logic(update, context, text): return
-
-    # قائمة الأوامر
-    if text in ["الاوامر", "قائمة"]:
-        await update.message.reply_text("👑 قائمة أوامر مونوبولي", reply_markup=games.get_main_menu_keyboard())
+# إعداد السجلات (Logs) لمراقبة أداء البوت
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 def main():
-    app = ApplicationBuilder().token(config.BOT_TOKEN).build()
-    app.add_handler(CallbackQueryHandler(games.callback_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, global_handler))
-    print("🚀 تم استعادة النسخة المستقرة بنجاح...")
-    app.run_polling()
+    try:
+        # بناء التطبيق مع إعدادات تضمن عدم تكرار الرسائل القديمة عند التشغيل
+        app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+        # إضافة معالج الرسائل النصية (يشمل الآن الألعاب، البنك، والتفاعل)
+        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
+        
+        # إضافة معالج الأزرار (القائمة الملكية)
+        app.add_handler(CallbackQueryHandler(callback_handler))
+
+        print("🚀 [النظام الملكي]: البوت يعمل الآن بكامل طاقته ومقسّم باحترافية...")
+        
+        # التشغيل بنظام Polling المستقر
+        # drop_pending_updates=True تضمن أن البوت لا يرد على الرسائل القديمة التي أُرسلت وهو مطفأ
+        app.run_polling(drop_pending_updates=True)
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ فادح في تشغيل البوت: {e}")
 
 if __name__ == '__main__':
     main()
