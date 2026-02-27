@@ -4,7 +4,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandle
 from config import BOT_TOKEN
 from handlers import handle_messages, callback_handler
 
-# إعداد السجلات (Logs) لمراقبة أداء البوت
+# إعداد السجلات (Logs)
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
     level=logging.INFO
@@ -13,19 +13,15 @@ logger = logging.getLogger(__name__)
 
 def main():
     try:
-        # بناء التطبيق مع إعدادات تضمن عدم تكرار الرسائل القديمة عند التشغيل
         app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-        # إضافة معالج الرسائل النصية (يشمل الآن الألعاب، البنك، والتفاعل)
         app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
-        
-        # إضافة معالج الأزرار (القائمة الملكية)
         app.add_handler(CallbackQueryHandler(callback_handler))
 
-        print("🚀 [النظام الملكي]: البوت يعمل الآن بكامل طاقته ومقسّم باحترافية...")
+        # --- الجملة الاختبارية لـ Anas ---
+        print("👑 [النظام الملكي]: يا Anas، أنا الآن أعمل بالنسخة الجديدة 2026! 🚀")
+        # -------------------------------
         
-        # التشغيل بنظام Polling المستقر
-        # drop_pending_updates=True تضمن أن البوت لا يرد على الرسائل القديمة التي أُرسلت وهو مطفأ
         app.run_polling(drop_pending_updates=True)
         
     except Exception as e:
