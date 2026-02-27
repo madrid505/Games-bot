@@ -31,15 +31,16 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
 
-    # 1. تحديث ملك التفاعل في الخلفية
+    # 1. تحديث عداد المشاركات في كل الأحوال
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    # 2. إرسال الأوامر للبنك (زرف، هدية، راتب) لضمان السرعة
+    # 2. فحص أوامر البنك (زرف، هدية، راتب، إلخ) - الأولوية القصوى
+    # إذا كان الأمر يخص البنك، سيقوم ملف البنك بالرد وينتهي التنفيذ هنا
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
-    # 3. عرض ملك التفاعل والتهنئة
+    # 3. أوامر ملك التفاعل
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -53,8 +54,9 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if current_msgs >= 1000:
         await update.message.reply_text(f"🔥🔥🔥 **ملك التفاعل** 🔥🔥\n\nاسم الملك : {u_name}\nعدد النقاط : {u_data.get('points', 0)}\nعدد المشاركات : {current_msgs}\n\n🔥🔥 مبارك الفوز يا اسطورة القروب 🔥🔥")
         db.update({'msg_count': 0}, User.id == u_id)
+        return
 
-    # 4. نظام الروليت الملكي
+    # 4. نظام الروليت الملكي (تكرار كلمة "انا")
     if text == "روليت":
         admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
         if u_id == OWNER_ID or u_id in admins:
@@ -63,7 +65,6 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "انا" and context.chat_data.get('r_on'):
-        # يسجل اللاعب إذا لم يكن مسجلاً، لكن يرسل الرسالة في كل مرة (تكرار)
         if not any(p['id'] == u_id for p in context.chat_data.get('r_players', [])):
             context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
         await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
