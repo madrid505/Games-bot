@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
-from db import get_user_data, db, User, add_to_album, update_card_counter
+from db import get_user_data, db, User, update_card_counter
 from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
@@ -14,7 +14,7 @@ from handlers.bank_handler import handle_bank
 CONTEST_NAME = "مسابقة قروب مونوبولي"
 SEASON_DURATION_DAYS = 30
 
-# 🖼️ ألبوم أساطير كرة القدم (تحديث الأسماء)
+# 🖼️ بطاقات الموسم (تحديث: أساطير كرة القدم)
 SEASON_ALBUM = {
     "card1": "🏟️ زين الدين زيدان",
     "card2": "🏟️ مودريتش",
@@ -30,7 +30,7 @@ SEASON_ALBUM = {
 
 QUESTIONS = load_questions()
 
-# 🔄 نظام تصفير الموسم التلقائي كل 30 يوم
+# 🔄 نظام تصفير الموسم التلقائي
 def check_and_reset_season():
     season_file = "season_start.txt"
     now = datetime.now()
@@ -63,10 +63,8 @@ def load_contest_images():
                 line = line.strip()
                 if line and '=' in line:
                     parts = line.split('=')
-                    f_id = parts[0]
-                    ans = parts[1]
-                    rarity = parts[2] if len(parts) > 2 else "عادية"
-                    contest_data.append({"file_id": f_id, "answer": ans, "rarity": rarity})
+                    quiz_data = {"file_id": parts[0], "answer": parts[1], "rarity": parts[2] if len(parts) > 2 else "عادية"}
+                    contest_data.append(quiz_data)
     return contest_data
 
 IMAGE_QUIZ = load_image_quiz()
@@ -83,32 +81,32 @@ def get_main_menu_keyboard(is_admin=False):
         [InlineKeyboardButton("🇬🇧 إنجليزي", callback_data="run_english"), InlineKeyboardButton("🔍 مختلف", callback_data="run_misc")],
         [InlineKeyboardButton("💰 الرصيد الملكي", callback_data="cmd_balance"), InlineKeyboardButton("🏆 الهوامير", callback_data="cmd_top")]
     ]
-    # إضافة زر نشر الإعلان للمدراء فقط
     if is_admin:
         keyboard.append([InlineKeyboardButton("📢 نشر الاعلان (خاص)", callback_data="admin_publish")])
     return InlineKeyboardMarkup(keyboard)
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.effective_chat or update.effective_chat.id not in GROUP_IDS or not update.message:
+    if not update.effective_chat or update.effective_chat.id not in GROUP_IDS or not update.message or not update.message.text:
         return
 
     check_and_reset_season()
+    text = update.message.text.strip()
     u_id = update.effective_user.id
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
 
-    admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
-    is_admin = u_id == OWNER_ID or u_id in admins
+    # 🛡️ جلب رتبة المشرفين
+    chat_admins = await context.bot.get_chat_administrators(update.effective_chat.id)
+    admins_ids = [a.user.id for a in chat_admins]
+    is_admin = u_id == OWNER_ID or u_id in admins_ids
 
-    # ملك التفاعل (يعمل عند كل رسالة)
+    # 👑 1. ملك التفاعل (المنطق المصحح)
     current_msgs = u_data.get('msg_count', 0) + 1
-    db.update({'msg_count': current_msgs}, User.id == u_id)
     if current_msgs >= 1000:
         await update.message.reply_text(f"🔥🔥 **ملك التفاعل الجديد** 🔥🔥\n\nالملك : {u_name}\nالمشاركات : {current_msgs}\n\n🏆 مبارك الفوز يا أسطورة!")
         db.update({'msg_count': 0}, User.id == u_id)
-
-    if not update.message.text: return
-    text = update.message.text.strip()
+    else:
+        db.update({'msg_count': current_msgs}, User.id == u_id)
 
     # 🛑 الإدارة (قفل/فتح/نشر إعلان)
     if text == "قفل الالعاب" and is_admin:
@@ -125,7 +123,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f.read())
         return
 
-    # 💰 أوامر البنك الملكي
+    # 💰 2. أوامر البنك الملكي
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
@@ -135,23 +133,24 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ **عذراً، الألعاب مقفلة حالياً من قبل الإدارة.**")
         return
 
-    # 👑 صلاحية المنح الملكي (للمالك فقط بالرد)
+    # 👑 3. صلاحية المنح الملكي (للمالك فقط بالرد)
     if text.startswith("منح بطاقة") and u_id == OWNER_ID and update.message.reply_to_message:
         try:
             c_num = text.split()[-1]
             card_key = f"card{c_num}"
             if card_key in SEASON_ALBUM:
                 target_user = update.message.reply_to_message.from_user
-                target_data = db.get(User.id == target_user.id)
-                new_alb = target_data.get('album', [])
+                t_data = db.get(User.id == target_user.id)
+                new_alb = t_data.get('album', [])
                 new_alb.append(card_key)
                 db.update({'album': new_alb}, User.id == target_user.id)
                 await update.message.reply_text(f"👑 **قرار ملكي:**\nتم منح البطل {target_user.first_name} بطاقة: `{SEASON_ALBUM[card_key]}` هبة من المالك! 🎁")
         except: pass
         return
 
-    # 🤝 نظام تبادل ومبايعة البطاقات (بالرد)
+    # 🤝 4. نظام تبادل ومبايعة البطاقات (كامل بدون نقص)
     if update.message.reply_to_message:
+        # أ: التبادل بطاقة مقابل بطاقة
         match_trade = re.search(r"تبادل بطاقة (\d+) ببطاقة (\d+)", text)
         if match_trade:
             c1_idx, c2_idx = match_trade.group(1), match_trade.group(2)
@@ -161,7 +160,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.chat_data[f"deal_{update.message.message_id}"] = {"type": "trade", "from": u_id, "to": target_user.id, "give": c1, "take": c2}
                 await update.message.reply_text(f"🤝 يا {target_user.first_name}، هل تقبل التبادل؟\nيعطيك: `{SEASON_ALBUM[c1]}`\nيأخذ منك: `{SEASON_ALBUM[c2]}`\n\nللإتمام أجب بكلمة: **تم القبول**")
             return
-
+        # ب: المبايعة مقابل مبلغ مالي
         match_sell = re.search(r"بيع بطاقة (\d+) بمبلغ (\d+)", text)
         if match_sell:
             c_idx, price = match_sell.group(1), int(match_sell.group(2))
@@ -172,8 +171,10 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"💰 عرض مبايعة إلى {target_user.first_name}:\nيشتري منك: `{SEASON_ALBUM[c_key]}`\nالمطلوب: {price:,} دينار\n\nللإتمام أجب بكلمة: **تم القبول**")
             return
 
+        # ج: تأكيد القبول (للتبادل والمبايعة)
         if text == "تم القبول":
-            deal = context.chat_data.get(f"deal_{update.message.reply_to_message.message_id}")
+            deal_key = f"deal_{update.message.reply_to_message.message_id}"
+            deal = context.chat_data.get(deal_key)
             if deal:
                 if deal['type'] == "trade" and u_id == deal['to']:
                     target_data = db.get(User.id == u_id)
@@ -185,8 +186,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         db.update({'album': u_src_alb}, User.id == deal['from'])
                         db.update({'album': u_trg_alb}, User.id == u_id)
                         await update.message.reply_text("✅ **تم التبادل الملكي بنجاح!** 🤝")
-                        del context.chat_data[f"deal_{update.message.reply_to_message.message_id}"]
-                
+                        del context.chat_data[deal_key]
                 elif deal['type'] == "sell" and u_id == deal['buyer']:
                     buyer_data = db.get(User.id == u_id)
                     if buyer_data.get('balance', 0) >= deal['price']:
@@ -197,36 +197,10 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             db.update({'album': s_alb, 'balance': seller_data['balance'] + deal['price']}, User.id == deal['seller'])
                             db.update({'album': b_alb, 'balance': buyer_data['balance'] - deal['price']}, User.id == u_id)
                             await update.message.reply_text(f"✅ **تمت المبايعة بنجاح!**\nاستلم البائع {deal['price']:,} دينار.")
-                            del context.chat_data[f"deal_{update.message.reply_to_message.message_id}"]
+                            del context.chat_data[deal_key]
             return
 
-    # 🎰 نظام الروليت الملكي
-    if text == "روليت" and is_admin:
-        context.chat_data.update({'r_on': True, 'r_players': [], 'r_starter': u_id})
-        await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹 ليتم تسجيل اشتراكك اكتب 'انا' 🌹")
-        return
-
-    if text == "انا" and context.chat_data.get('r_on'):
-        if not any(p['id'] == u_id for p in context.chat_data['r_players']):
-            context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
-            await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
-        return
-
-    if text == "تم" and context.chat_data.get('r_on') and u_id == context.chat_data['r_starter']:
-        players = context.chat_data.get('r_players', [])
-        if players:
-            win = random.choice(players); w_db = db.get(User.id == win['id'])
-            new_wins = (w_db.get('roulette_wins', 0) if w_db else 0) + 1
-            db.update({'roulette_wins': new_wins}, User.id == win['id'])
-            if new_wins >= 5:
-                await update.message.reply_text(f"✨✨✨✨✨✨✨\n👑👑 **ملك الروليت الأسطوري** 👑👑\n\n👑 「 {win['name']} 」 👑\nتوج باللقب بـ 5 انتصارات! ✨")
-                db.update({'roulette_wins': 0}, User.id == win['id'])
-            else:
-                await update.message.reply_text(f"👑👑 مباااابارك الفوز يا اسطورة الروليت 👑👑\n\n👑 \" {win['name']} \" 👑\n🏆 فوزك رقم: ( {new_wins} )")
-        context.chat_data['r_on'] = False
-        return
-
-    # 🏆 نظام توزيع البطاقات (تراكمي)
+    # 🏆 5. نظام توزيع البطاقات (تراكمي) وجائزة الختم
     async def distribute_card(user_data):
         current_counter = user_data.get('card_counter', 0) + 1
         if current_counter >= 5:
@@ -234,63 +208,16 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             card_name = SEASON_ALBUM[card_id]
             current_album = user_data.get('album', [])
             current_album.append(card_id)
-            db.update({'album': current_album}, User.id == u_id)
+            db.update({'album': current_album, 'card_counter': 0}, User.id == u_id)
             await update.message.reply_text(f"🌟 **مبروك!** حصلت على بطاقة: `{card_name}` 📂")
             if len(set(current_album)) == 10:
-                grand_prize = 1000000000
-                db.update({'balance': user_data.get('balance', 0) + grand_prize, 'points': user_data.get('points', 0) + 500}, User.id == u_id)
-                await update.message.reply_text(f"🎉🎊 **إنجاز ملكي أسطوري!!!** 🎊🎉\nلقد ختمت الـ 10 بطاقات!\n💰 الجائزة: مليار دينار + 500 نقطة!")
-            update_card_counter(u_id, 0)
+                db.update({'balance': user_data.get('balance', 0) + 1000000000, 'points': user_data.get('points', 0) + 500}, User.id == u_id)
+                await update.message.reply_text(f"🎉🎊 **إنجاز ملكي أسطوري!!!** 🎊🎉\nلقد ختمت ألبوم الأساطير كاملاً!\n💰 الجائزة: مليار دينار + 500 نقطة!")
         else:
             update_card_counter(u_id, current_counter)
-            await update.message.reply_text(f"🎯 **صح!** فاضل لك **{5 - current_counter}** نقاط للبطاقة القادمة. 🔥")
+            await update.message.reply_text(f"🎯 **إجابة صحيحة!** باقي لك **{5 - current_counter}** نقاط للبطاقة.")
 
-    # 🎮 تشغيل الألعاب (لعبة الصور ومسابقة الصور تزيد نقاط الصور وتمنح بطاقات)
-    if text == "صور":
-        if IMAGE_QUIZ:
-            q = random.choice(IMAGE_QUIZ)
-            context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
-            await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**")
-        return
-
-    if text == "مسابقة":
-        if CONTEST_QUIZ:
-            q = random.choice(CONTEST_QUIZ)
-            context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
-            await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🏆 **{CONTEST_NAME} - مسابقة الصور**\n💎 الندرة: {q.get('rarity', 'عادية')}")
-        return
-
-    img_ans = context.chat_data.get('img_ans')
-    if img_ans and text == img_ans:
-        start_time = context.chat_data.get('img_start_time', time.time())
-        elapsed_time = round(time.time() - start_time, 2)
-        new_img_pts = u_data.get('image_points', 0) + 1
-        db.update({'image_points': new_img_pts}, User.id == u_id)
-        win_msg = f"✅ **صح يا عبقري!**\n👤: {u_name}\n⏱️: {elapsed_time}ث\n📊 نقاطك: {new_img_pts}"
-        context.chat_data.update({'last_win_msg': win_msg, 'last_win_type': "images", 'img_ans': None})
-        await update.message.reply_text(win_msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏆 دفتر النتائج", callback_data="show_top_images")]]))
-        await distribute_card(u_data) # النقاط مشتركة وتؤدي للبطاقة
-        return
-
-    game_map = {"إسلاميات": "islamic", "ثقافة عامة": "general", "سيارات": "cars", "أندية": "clubs", "عواصم": "countries", "أعلام": "flags", "عكس": "reverse", "ترتيب": "order", "تفكيك": "decompose", "رياضيات": "math", "إنجليزي": "english", "كلمات": "words", "مختلف": "misc"}
-    if text in game_map:
-        key = game_map[text]
-        if key in QUESTIONS:
-            q = random.choice(QUESTIONS[key])
-            context.chat_data.update({'game_ans': q['answer'], 'game_start_time': time.time()})
-            await update.message.reply_text(f"🎮 **بدأت {text}**:\n【 {q['question']} 】")
-            return
-
-    correct_ans = context.chat_data.get('game_ans')
-    if correct_ans and text == str(correct_ans):
-        db.update({'balance': u_data['balance'] + 50000, 'points': u_data['points'] + 1}, User.id == u_id)
-        win_text = f"✅ **صح!** {u_name}\n💰 50,000 دينار + 1 نقطة"
-        context.chat_data.update({'last_win_msg': win_text, 'last_win_type': "general", 'game_ans': None})
-        await update.message.reply_text(win_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏆 دفتر النتائج", callback_data="show_top_general")]]))
-        await distribute_card(u_data)
-        return
-
-    # 📂 أمر ألبومي
+    # 📂 6. أمر ألبومي (أسماء الأساطير)
     if text in ["ألبومي", "البومي"]:
         album = u_data.get('album', [])
         msg = f"📂 **ألبوم {CONTEST_NAME}** 📂\n\n"
@@ -302,40 +229,56 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg)
         return
 
-    if text in ["قائمة", "الاوامر", "الأوامر"]:
-        await update.message.reply_text(f"👑 **{CONTEST_NAME}**", reply_markup=get_main_menu_keyboard(is_admin))
+    # 🎰 7. نظام الروليت الملكي (تكرار 'انا' مسموح)
+    if text == "روليت" and is_admin:
+        context.chat_data.update({'r_on': True, 'r_players': [], 'r_starter': u_id})
+        await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹 ليتم تسجيل اشتراكك اكتب 'انا' 🌹")
+        return
 
-# 🔘 معالج الأزرار (Callback)
-async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query; data = query.data; await query.answer()
-    u_id = update.effective_user.id
-    admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
-    is_admin = u_id == OWNER_ID or u_id in admins
+    if text == "انا" and context.chat_data.get('r_on'):
+        context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
+        await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
+        return
 
-    if data == "admin_publish" and is_admin:
-        if os.path.exists("announcement.txt"):
-            with open("announcement.txt", "r", encoding="utf-8") as f:
-                await query.message.reply_text(f.read())
-    elif data.startswith("show_top_"):
-        all_u = db.all(); sort_key = 'image_points' if "images" in data else 'points'
-        top_u = sorted(all_u, key=lambda x: x.get(sort_key, 0), reverse=True)[:10]
-        msg = f"📊 **متصدري {('الصور' if 'images' in data else 'النقاط')}** 📊\n\n"
-        for i, u in enumerate(top_u): msg += f"{i+1}- {u.get('name')} ⮕ {u.get(sort_key)}\n"
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_win")]]))
-    elif data == "back_to_win":
-        msg = context.chat_data.get('last_win_msg', "✅")
-        target = "show_top_images" if context.chat_data.get('last_win_type') == "images" else "show_top_general"
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏆 دفتر النتائج", callback_data=target)]]))
-    elif data == "run_image_game":
-        if IMAGE_QUIZ:
-            q = random.choice(IMAGE_QUIZ); context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
-            await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**")
-    elif data == "run_contest_game":
-        if CONTEST_QUIZ:
-            q = random.choice(CONTEST_QUIZ); context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
-            await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🏆 **مسابقة الصور الملكية**")
+    if text == "تم" and context.chat_data.get('r_on') and is_admin:
+        players = context.chat_data.get('r_players', [])
+        if players:
+            win = random.choice(players); w_db = db.get(User.id == win['id'])
+            new_wins = (w_db.get('roulette_wins', 0) if w_db else 0) + 1
+            db.update({'roulette_wins': new_wins}, User.id == win['id'])
+            if new_wins >= 5:
+                await update.message.reply_text(f"✨✨✨\n👑👑 **ملك الروليت الأسطوري** 👑👑\n\n👑 「 {win['name']} 」 👑\nتوج باللقب بـ 5 انتصارات! ✨")
+                db.update({'roulette_wins': 0}, User.id == win['id'])
+            else:
+                await update.message.reply_text(f
+    # 🧩 تكملة تشغيل الألعاب النصية من الأزرار (سطر 254 وما فوق)
     elif data.startswith("run_"):
-        game = data.replace("run_", "")
-        if game in QUESTIONS:
-            q = random.choice(QUESTIONS[game]); context.chat_data.update({'game_ans': q['answer'], 'game_start_time': time.time()})
-            await query.message.reply_text(f"🎮 **بدأت {game}**:\n【 {q['question']} 】")
+        game_key = data.replace("run_", "")
+        if game_key in QUESTIONS:
+            q = random.choice(QUESTIONS[game_key])
+            context.chat_data.update({
+                'game_ans': q['answer'],
+                'game_start_time': time.time(),
+                'current_game_name': game_key
+            })
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"🎮 **بدأت لعبة {game_key}**:\n\n【 {q['question']} 】"
+            )
+        return
+
+    # 💰 أوامر البنك من الأزرار
+    elif data == "cmd_balance":
+        balance_msg = f"💰 **مصرف مونوبولي الملكي** 💰\n\n👤 العضو: {update.effective_user.first_name}\n💵 الرصيد: {u_data.get('balance', 0):,} دينار\n📊 النقاط: {u_data.get('points', 0)}"
+        await query.edit_message_text(balance_msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="back_to_menu")]]))
+        
+    elif data == "cmd_top":
+        all_users = db.all()
+        top_rich = sorted(all_users, key=lambda x: x.get('balance', 0), reverse=True)[:10]
+        msg = "🏆 **قائمة هوامير مونوبولي** 🏆\n\n"
+        for i, u in enumerate(top_rich):
+            msg += f"{i+1}- {u.get('name', 'غير معروف')} ⮕ {u.get('balance', 0):,} 💰\n"
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_menu")]]))
+
+    elif data == "back_to_menu":
+        await query.edit_message_text(f"👑 **{CONTEST_NAME}**", reply_markup=get_main_menu_keyboard(is_admin))
