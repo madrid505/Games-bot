@@ -1,6 +1,7 @@
 from .games_handler import handle_messages, callback_handler
+from .bank_handler import handle_bank
 
-# هذا الملف يعمل كجسر لربط ملف الألعاب والبنك والفعاليات
-# بحيث يقرأ ملف main.py الوظائف الأساسية مباشرة
+# هذا الملف هو قلب الوصل البرمجي لمملكة مونوبولي
+# يجمع بين نظام الألعاب، البنك، والألبومات
 
-__all__ = ['handle_messages', 'callback_handler']
+__all__ = ['handle_messages', 'callback_handler', 'handle_bank']
