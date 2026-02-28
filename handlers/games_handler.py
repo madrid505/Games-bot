@@ -9,14 +9,8 @@ from handlers.bank_handler import handle_bank
 # تحميل الأسئلة النصية
 QUESTIONS = load_questions()
 
-# 🖼️ مخزن صور لعبة الصور (File IDs محدثة)
-IMAGE_QUIZ = [
-    {"file_id": "AgACAgQAAxkBAAICMmc_P_8m_m_m_m_m_m_m_m_m_m", "answer": "جمل"},
-    {"file_id": "AgACAgQAAxkBAAICNmc_P_8m_m_m_m_m_m_m_m_m_m", "answer": "صومال"},
-    {"file_id": "AgACAgQAAxkBAAICOmc_P_8m_m_m_m_m_m_m_m_m_m", "answer": "ذباب"},
-    {"file_id": "AgACAgQAAxkBAAICPmc_P_8m_m_m_m_m_m_m_m_m_m", "answer": "العلم نور"},
-    {"file_id": "AgACAgQAAxkBAAICQmc_P_8m_m_m_m_m_m_m_m_m_m", "answer": "سكوتك من ذهب"}
-]
+# قاعدة بيانات الصور (مؤقتاً فارغة حتى ترسل لي الأكواد)
+IMAGE_QUIZ = []
 
 def get_main_menu_keyboard():
     keyboard = [
@@ -33,6 +27,12 @@ def get_main_menu_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 🕵️ كود صيد الـ ID (مؤقت) - ابعث الصورة للبوت ورح يعطيك الكود
+    if update.message and update.message.photo:
+        photo_id = update.message.photo[-1].file_id
+        await update.message.reply_text(f"✅ تم صيد الـ ID بنجاح يا ملك:\n\n`{photo_id}`", parse_mode='MarkdownV2')
+        return
+
     if not update.effective_chat or update.effective_chat.id not in GROUP_IDS or not update.message or not update.message.text:
         return
 
@@ -116,12 +116,15 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 7. تشغيل الألعاب
     if text == "صور":
+        if not IMAGE_QUIZ:
+            await update.message.reply_text("⚠️ يا ملك، لازم نحدث أكواد الصور أولاً، ابعث الصور للبوت هسا!")
+            return
         quiz = random.choice(IMAGE_QUIZ)
         context.chat_data['img_ans'] = quiz['answer']
         try:
             await context.bot.send_photo(chat_id=update.effective_chat.id, photo=quiz['file_id'], caption="🎮 **لعبة الصور الملكية بدأت!**\n\nماذا تعني هذه الصورة؟")
         except:
-            await update.message.reply_text("⚠️ **عذراً يا ملك:** عنوان الصورة خربان، لازم نحدثه!")
+            await update.message.reply_text("⚠️ الكود خربان!")
         return
 
     game_map = {"إسلاميات": "islamic", "ثقافة عامة": "general", "سيارات": "cars", "أندية": "clubs", "عواصم": "countries", "أعلام": "flags", "عكس": "reverse", "ترتيب": "order", "تفكيك": "decompose", "رياضيات": "math", "إنجليزي": "english", "كلمات": "words", "مختلف": "misc"}
@@ -149,12 +152,15 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if query.data == "run_image_game":
+        if not IMAGE_QUIZ:
+            await query.message.reply_text("⚠️ ابعث الصور للبوت أولاً لصيد الأكواد!")
+            return
         quiz = random.choice(IMAGE_QUIZ)
         context.chat_data['img_ans'] = quiz['answer']
         try:
             await context.bot.send_photo(chat_id=update.effective_chat.id, photo=quiz['file_id'], caption="🎮 **لعبة الصور الملكية**\nماذا تعني هذه الصورة؟")
         except:
-            await query.message.reply_text("⚠️ عنوان الصورة خربان!")
+            await query.message.reply_text("⚠️ الكود خربان!")
         return
     if query.data.startswith("run_"):
         game = query.data.replace("run_", "")
