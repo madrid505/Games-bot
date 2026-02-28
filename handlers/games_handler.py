@@ -1,8 +1,10 @@
 import random
 import os
+import time
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from db import get_user_data, db, User
+# ملاحظة: تأكد من أن get_top_users مضافة في ملف db.py لديك
 from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
@@ -22,7 +24,6 @@ def load_image_quiz():
                     quiz_data.append({"file_id": f_id, "answer": ans})
     return quiz_data
 
-# تحميل القائمة عند تشغيل البوت
 IMAGE_QUIZ = load_image_quiz()
 
 def get_main_menu_keyboard():
@@ -52,20 +53,31 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    # 2. فحص أوامر البنك (الأولوية للراتب والزرف)
+    # 2. فحص أوامر البنك (الراتب والزرف)
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
-    # 3. فحص إجابة الصور
+    # 3. فحص إجابة الصور (مع الوقت ودفتر النتائج)
     img_ans = context.chat_data.get('img_ans')
     if img_ans and text == img_ans:
+        start_time = context.chat_data.get('img_start_time', time.time())
+        elapsed_time = round(time.time() - start_time, 2)
         new_img_pts = u_data.get('image_points', 0) + 1
         db.update({'image_points': new_img_pts}, User.id == u_id)
-        await update.message.reply_text(f"✅ **صح يا 🎖️ عبقري الصور!**\n\n👤 اللاعب: {u_name}\n🏆 الجائزة: نقطة صور واحدة.\n📊 مجموع نقاطك في الصور: {new_img_pts}")
+        
+        win_msg = (
+            f"✅ **صح يا 🎖️ عبقري الصور!**\n\n"
+            f"👤 اللاعب: {u_name}\n"
+            f"⏱️ الوقت: {elapsed_time} ثانية\n"
+            f"🏆 الجائزة: نقطة صور واحدة.\n"
+            f"📊 مجموع نقاطك في الصور: {new_img_pts}"
+        )
+        keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data="show_top_images")]]
+        await update.message.reply_text(win_msg, reply_markup=InlineKeyboardMarkup(keyboard))
         context.chat_data['img_ans'] = None
         return
 
-    # 4. ملك التفاعل (توب 10 + عداد الـ 1000)
+    # 4. ملك التفاعل
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -81,7 +93,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.update({'msg_count': 0}, User.id == u_id)
         return
 
-    # 5. توب صور (داش سكور الصور)
+    # 5. توب صور
     if text == "توب صور":
         all_u = db.all()
         top_img = sorted(all_u, key=lambda x: x.get('image_points', 0), reverse=True)[:10]
@@ -92,7 +104,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg if "⮕" in msg else "لا يوجد متصدرين في الصور بعد!")
         return
 
-    # 6. نظام الروليت
+    # 6. نظام الروليت (التكرار مسموح للأبد ✅)
     if text == "روليت":
         admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
         if u_id == OWNER_ID or u_id in admins:
@@ -101,8 +113,8 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "انا" and context.chat_data.get('r_on'):
-        if not any(p['id'] == u_id for p in context.chat_data.get('r_players', [])):
-            context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
+        # تم حذف شرط التحقق من التكرار بناءً على طلب الملك
+        context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
         await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
         return
 
@@ -117,17 +129,16 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"✨✨✨✨✨✨✨✨✨✨✨✨\n👑👑 **ملك الروليت الأسطوري** 👑👑\n\n👑 「 {win['name']} 」 👑\n\nلقب **ملك الروليت** بـ 5 انتصارات أسطورية!\n✨✨✨✨✨✨✨✨✨✨✨✨")
                 db.update({'roulette_wins': 0}, User.id == win['id'])
             else:
-                await update.message.reply_text(f"👑👑 مبااااارك الفوز يا اسطورة الروليت 👑👑\n\n👑 \" {win['name']} \" 👑\n🏆 فوزك رقم: ( {new_wins} )")
+                await update.message.reply_text(f"👑👑 مباااابارك الفوز يا اسطورة الروليت 👑👑\n\n👑 \" {win['name']} \" 👑\n🏆 فوزك رقم: ( {new_wins} )")
         context.chat_data['r_on'] = False
         return
 
-    # 7. تشغيل الألعاب (نص وصور)
+    # 7. تشغيل الألعاب
     if text == "صور":
-        if not IMAGE_QUIZ:
-            await update.message.reply_text("⚠️ لا توجد صور في الملف حالياً!")
-            return
+        if not IMAGE_QUIZ: return
         quiz = random.choice(IMAGE_QUIZ)
         context.chat_data['img_ans'] = quiz['answer']
+        context.chat_data['img_start_time'] = time.time()
         await context.bot.send_photo(chat_id=update.effective_chat.id, photo=quiz['file_id'], caption="🎮 **لعبة الصور الملكية بدأت!**\n\nماذا تعني هذه الصورة؟")
         return
 
@@ -137,14 +148,25 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if game_key in QUESTIONS:
             q = random.choice(QUESTIONS[game_key])
             context.chat_data['game_ans'] = q['answer']
+            context.chat_data['game_start_time'] = time.time()
             await update.message.reply_text(f"🎮 **بدأت {text}**:\n【 {q['question']} 】")
             return
 
     # 8. التحقق من الإجابة النصية
     correct_ans = context.chat_data.get('game_ans')
     if correct_ans and text == str(correct_ans):
+        start_time = context.chat_data.get('game_start_time', time.time())
+        elapsed_time = round(time.time() - start_time, 2)
         db.update({'balance': u_data['balance'] + 50000, 'points': u_data['points'] + 1}, User.id == u_id)
-        await update.message.reply_text(f"✅ **صح!** {u_name} فزت بـ 50,000 دينار ونقطة.")
+        
+        win_text = (
+            f"✅ **صح!** {u_name}\n"
+            f"⏱️ الوقت : {elapsed_time} ثانية\n"
+            f"📖 الجواب : {correct_ans}\n"
+            f"💰 الجائزة : 50,000 دينار + 1 نقطة"
+        )
+        keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data="show_top_general")]]
+        await update.message.reply_text(win_text, reply_markup=InlineKeyboardMarkup(keyboard))
         context.chat_data['game_ans'] = None
         return
 
@@ -154,18 +176,37 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    data = query.data
     await query.answer()
-    if query.data == "run_image_game":
-        if not IMAGE_QUIZ:
-            await query.message.reply_text("⚠️ لا توجد صور مضافة!")
-            return
+
+    if data.startswith("show_top_"):
+        all_u = db.all()
+        sort_key = 'image_points' if "images" in data else 'points'
+        title = "🖼️ متصدري الصور" if "images" in data else "🏆 متصدري النقاط"
+        top_u = sorted(all_u, key=lambda x: x.get(sort_key, 0), reverse=True)[:10]
+        msg = f"📊 **{title} - TOP 10** 📊\n\n"
+        for i, user in enumerate(top_u):
+            msg += f"{i+1}- {user.get('name', 'لاعب')} ⮕ {user.get(sort_key, 0)}\n"
+        keyboard = [[InlineKeyboardButton("🔙 إغلاق", callback_data="close_result")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    if data == "close_result":
+        await query.message.delete()
+        return
+
+    if data == "run_image_game":
+        if not IMAGE_QUIZ: return
         quiz = random.choice(IMAGE_QUIZ)
         context.chat_data['img_ans'] = quiz['answer']
+        context.chat_data['img_start_time'] = time.time()
         await context.bot.send_photo(chat_id=update.effective_chat.id, photo=quiz['file_id'], caption="🎮 **لعبة الصور الملكية**\nماذا تعني هذه الصورة؟")
         return
-    if query.data.startswith("run_"):
-        game = query.data.replace("run_", "")
+
+    if data.startswith("run_"):
+        game = data.replace("run_", "")
         if game in QUESTIONS:
             q = random.choice(QUESTIONS[game])
             context.chat_data['game_ans'] = q['answer']
+            context.chat_data['game_start_time'] = time.time()
             await query.message.reply_text(f"🎮 **بدأت {game}**:\n【 {q['question']} 】")
