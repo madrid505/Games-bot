@@ -16,9 +16,29 @@ async def get_user_data(update):
             'name': update.effective_user.first_name,
             'balance': balance,
             'points': 0,
+            'image_points': 0,    # أضفنا حقل نقاط الصور
+            'msg_count': 0,       # أضفنا حقل ملك التفاعل
             'roulette_wins': 0,
             'last_salary': 0,
             'last_gift': 0
         }
         db.insert(u_data)
+    
+    # تأكد من وجود الحقول الجديدة حتى للمستخدمين القدامى
+    changed = False
+    if 'image_points' not in u_data:
+        u_data['image_points'] = 0
+        changed = True
+    if 'msg_count' not in u_data:
+        u_data['msg_count'] = 0
+        changed = True
+    if changed:
+        db.update(u_data, User.id == user_id)
+        
     return u_data
+
+# دالة جلب الترتيب (ضرورية لدفتر النتائج)
+def get_top_users(limit=10):
+    all_users = db.all()
+    # نرجع كل المستخدمين ليتم ترتيبهم داخل الـ handler حسب نوع اللعبة
+    return all_users
