@@ -6,11 +6,21 @@ from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
 
-# تحميل الأسئلة
+# تحميل الأسئلة النصية
 QUESTIONS = load_questions()
+
+# 🖼️ مخزن صور لعبة الصور (File IDs الحقيقية لصورك)
+IMAGE_QUIZ = [
+    {"file_id": "19f61dac0a0e57b200064bd68957bd8108bbc50f21234213", "answer": "جمل"},
+    {"file_id": "f5b72e85206b14c200064bd68af87e1707fd93b31b2e082b", "answer": "صومال"},
+    {"file_id": "f6514686f5f8b08500064bd68c40830607fdba48123218ea", "answer": "ذباب"},
+    {"file_id": "da2657310e63d77000064bd68d9f52ce08bbe7ee8832aec9", "answer": "العلم نور"},
+    {"file_id": "11689436ceefdccc00064bd68f2632bf07fd989dcf140a77", "answer": "سكوتك من ذهب"}
+]
 
 def get_main_menu_keyboard():
     keyboard = [
+        [InlineKeyboardButton("🖼️ لعبة الصور", callback_data="run_image_game")],
         [InlineKeyboardButton("🕋 إسلاميات", callback_data="run_islamic"), InlineKeyboardButton("💡 ثقافة عامة", callback_data="run_general")],
         [InlineKeyboardButton("🏎️ سيارات", callback_data="run_cars"), InlineKeyboardButton("⚽ أندية", callback_data="run_clubs")],
         [InlineKeyboardButton("🌍 عواصم", callback_data="run_countries"), InlineKeyboardButton("🚩 أعلام", callback_data="run_flags")],
@@ -31,16 +41,24 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
 
-    # 1. تحديث عداد المشاركات في كل الأحوال
+    # 1. تحديث المشاركات
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    # 2. فحص أوامر البنك (زرف، هدية، راتب، إلخ) - الأولوية القصوى
-    # إذا كان الأمر يخص البنك، سيقوم ملف البنك بالرد وينتهي التنفيذ هنا
+    # 2. فحص أوامر البنك (الأولوية)
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
-    # 3. أوامر ملك التفاعل
+    # 3. فحص إجابة الصور
+    img_ans = context.chat_data.get('img_ans')
+    if img_ans and text == img_ans:
+        new_img_pts = u_data.get('image_points', 0) + 1
+        db.update({'image_points': new_img_pts}, User.id == u_id)
+        await update.message.reply_text(f"✅ **صح يا 🎖️ عبقري الصور!**\n\n👤 اللاعب: {u_name}\n🏆 الجائزة: نقطة صور واحدة.\n📊 مجموع نقاطك في الصور: {new_img_pts}")
+        context.chat_data['img_ans'] = None
+        return
+
+    # 4. أوامر ملك التفاعل (1000 مشاركة)
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -56,7 +74,18 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.update({'msg_count': 0}, User.id == u_id)
         return
 
-    # 4. نظام الروليت الملكي (تكرار كلمة "انا")
+    # 5. أمر "توب صور" (الداش سكور)
+    if text == "توب صور":
+        all_u = db.all()
+        top_img = sorted(all_u, key=lambda x: x.get('image_points', 0), reverse=True)[:10]
+        msg = "🖼️ **لوحة شرف عباقرة الصور - TOP 10** 🖼️\n\n"
+        for i, user in enumerate(top_img):
+            pts = user.get('image_points', 0)
+            if pts > 0: msg += f"{i+1} - {user.get('name', 'لاعب')} ⮕ {pts} نقطة\n"
+        await update.message.reply_text(msg if "⮕" in msg else "لا يوجد متصدرين في الصور بعد!")
+        return
+
+    # 6. نظام الروليت الملكي (نصوصك الأصلية)
     if text == "روليت":
         admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
         if u_id == OWNER_ID or u_id in admins:
@@ -85,14 +114,14 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['r_on'] = False
         return
 
-    # 5. تشغيل الألعاب بالنص
-    game_map = {
-        "إسلاميات": "islamic", "ثقافة عامة": "general", "سيارات": "cars", 
-        "أندية": "clubs", "عواصم": "countries", "أعلام": "flags", 
-        "عكس": "reverse", "ترتيب": "order", "تفكيك": "decompose", 
-        "رياضيات": "math", "إنجليزي": "english", "كلمات": "words", "مختلف": "misc"
-    }
+    # 7. تشغيل الألعاب
+    if text == "صور":
+        quiz = random.choice(IMAGE_QUIZ)
+        context.chat_data['img_ans'] = quiz['answer']
+        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=quiz['file_id'], caption="🎮 **لعبة الصور الملكية بدأت!**\n\nماذا تعني هذه الصورة؟")
+        return
 
+    game_map = {"إسلاميات": "islamic", "ثقافة عامة": "general", "سيارات": "cars", "أندية": "clubs", "عواصم": "countries", "أعلام": "flags", "عكس": "reverse", "ترتيب": "order", "تفكيك": "decompose", "رياضيات": "math", "إنجليزي": "english", "كلمات": "words", "مختلف": "misc"}
     if text in game_map:
         game_key = game_map[text]
         if game_key in QUESTIONS:
@@ -101,7 +130,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"🎮 **بدأت {text}**:\n【 {q['question']} 】")
             return
 
-    # 6. التحقق من الإجابة
+    # 8. التحقق من إجابة النص
     correct_ans = context.chat_data.get('game_ans')
     if correct_ans and text == str(correct_ans):
         db.update({'balance': u_data['balance'] + 50000, 'points': u_data['points'] + 1}, User.id == u_id)
@@ -109,7 +138,6 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['game_ans'] = None
         return
 
-    # 7. قائمة الأوامر
     if text in ["قائمة", "الاوامر", "الأوامر"]:
         await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑", reply_markup=get_main_menu_keyboard())
         return
@@ -117,9 +145,13 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    data = query.data
-    if data.startswith("run_"):
-        game = data.replace("run_", "")
+    if query.data == "run_image_game":
+        quiz = random.choice(IMAGE_QUIZ)
+        context.chat_data['img_ans'] = quiz['answer']
+        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=quiz['file_id'], caption="🎮 **لعبة الصور الملكية**\nماذا تعني هذه الصورة؟")
+        return
+    if query.data.startswith("run_"):
+        game = query.data.replace("run_", "")
         if game in QUESTIONS:
             q = random.choice(QUESTIONS[game])
             context.chat_data['game_ans'] = q['answer']
