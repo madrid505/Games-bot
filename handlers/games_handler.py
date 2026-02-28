@@ -3,13 +3,22 @@ import os
 import time
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
-from db import get_user_data, db, User
+from db import get_user_data, db, User, add_to_album  # أضفنا add_to_album
 from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
 
 # تحميل الأسئلة النصية
 QUESTIONS = load_questions()
+
+# 🖼️ إعدادات الموسم (صور الألبوم النادرة)
+SEASON_ALBUM = {
+    "card1": "🏆 أسطورة مونوبولي",
+    "card2": "💎 الملياردير الملكي",
+    "card3": "🌟 نجم القروب",
+    "card4": "🥇 البطل الخارق",
+    "card5": "🔥 شعلة التفاعل"
+}
 
 # 🖼️ دالة قراءة صور الألعاب من الملف الخارجي
 def load_image_quiz():
@@ -48,6 +57,20 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
 
+    # التحقق التلقائي من الإدارة
+    admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
+    is_admin = u_id == OWNER_ID or u_id in admins
+
+    # 🛑 نظام قفل وفتح الألعاب (للمشرفين فقط)
+    if text == "قفل الالعاب" and is_admin:
+        context.chat_data['games_locked'] = True
+        await update.message.reply_text("🚫 **تم قفل الألعاب من قبل الإدارة.**")
+        return
+    if text == "فتح الالعاب" and is_admin:
+        context.chat_data['games_locked'] = False
+        await update.message.reply_text("✅ **تم فتح الألعاب.. انطلقوا!**")
+        return
+
     # 1. تحديث المشاركات (ملك التفاعل)
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
@@ -55,6 +78,19 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. فحص أوامر البنك
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
+
+    # منع اللاعبين من استخدام أوامر الألعاب إذا كانت مقفلة
+    if context.chat_data.get('games_locked') and text in ["صور", "روليت"] or text in QUESTIONS:
+        if not is_admin:
+            await update.message.reply_text("⚠️ **عذراً، الألعاب مقفلة حالياً من قبل الإدارة.**")
+            return
+
+    # دالة توزيع بطاقات الألبوم (فرصة 20% عند الفوز)
+    async def distribute_card():
+        if random.random() < 0.20:
+            card_id = random.choice(list(SEASON_ALBUM.keys()))
+            if add_to_album(u_id, card_id):
+                await update.message.reply_text(f"🌟 **مبروك!** حصلت على بطاقة نادرة للألبوم: `{SEASON_ALBUM[card_id]}`")
 
     # 3. فحص إجابة الصور
     img_ans = context.chat_data.get('img_ans')
@@ -71,12 +107,12 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🏆 الجائزة: نقطة صور واحدة.\n"
             f"📊 مجموع نقاطك في الصور: {new_img_pts}"
         )
-        # تخزين بيانات الفوز للرجوع إليها
         context.chat_data['last_win_msg'] = win_msg
         context.chat_data['last_win_type'] = "images"
         
         keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data="show_top_images")]]
         await update.message.reply_text(win_msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        await distribute_card() # فرصة لربح بطاقة
         context.chat_data['img_ans'] = None
         return
 
@@ -96,6 +132,19 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.update({'msg_count': 0}, User.id == u_id)
         return
 
+    # أمر ألبومي
+    if text == "ألبومي" or text == "البومي":
+        album = u_data.get('album', [])
+        if not album:
+            await update.message.reply_text("📭 ألبومك فارغ.. جاوب على الألعاب لجمع البطاقات!")
+        else:
+            msg = "📂 **ألبوم الصور الملكي الخاص بك:**\n\n"
+            for c_id in album:
+                msg += f"🔹 {SEASON_ALBUM.get(c_id)}\n"
+            msg += f"\n✅ جمعت {len(album)} من {len(SEASON_ALBUM)}"
+            await update.message.reply_text(msg)
+        return
+
     # 5. توب صور
     if text == "توب صور":
         all_u = db.all()
@@ -109,8 +158,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 6. نظام الروليت (تكرار 'انا' مسموح)
     if text == "روليت":
-        admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
-        if u_id == OWNER_ID or u_id in admins:
+        if is_admin:
             context.chat_data['r_on'], context.chat_data['r_players'], context.chat_data['r_starter'] = True, [], u_id
             await update.message.reply_text("🔥🔥 يا شعب مونوبولي العظيم 🔥🔥\n\n👈 لقد بدأت لعبة الروليت 👉\n\n🌹🌹 ليتم تسجيل اشتراكك في الجولة اكتب 'انا' 🌹🌹")
         return
@@ -172,6 +220,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data="show_top_general")]]
         await update.message.reply_text(win_text, reply_markup=InlineKeyboardMarkup(keyboard))
+        await distribute_card() # فرصة لربح بطاقة
         context.chat_data['game_ans'] = None
         return
 
@@ -179,7 +228,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑", reply_markup=get_main_menu_keyboard())
         return
 
-# --- معالج الأزرار المطور بالرجوع التفاعلي ---
+# معالج الأزرار
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -196,12 +245,10 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🔹"
             msg += f"{medal} {i+1}- {user.get('name', 'لاعب')} ⮕ {user.get(sort_key, 0)}\n"
         
-        # زر الرجوع لرسالة الفوز الأصلية
         keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_win")]]
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # زر الرجوع: يعيد النص الأصلي للفوز وزر "رؤية دفتر النتائج"
     if data == "back_to_win":
         original_msg = context.chat_data.get('last_win_msg', "✅ تمت الإجابة بنجاح!")
         win_type = context.chat_data.get('last_win_type', "general")
