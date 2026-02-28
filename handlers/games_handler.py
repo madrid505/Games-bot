@@ -1,4 +1,5 @@
 import random
+import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from db import get_user_data, db, User
@@ -9,14 +10,20 @@ from handlers.bank_handler import handle_bank
 # تحميل الأسئلة النصية
 QUESTIONS = load_questions()
 
-# 🖼️ مخزن صور لعبة الصور (تم التحديث بالأكواد الحقيقية)
-IMAGE_QUIZ = [
-    {"file_id": "AgACAgQAAxkBAAMhaaI5e7aj-9fAJodqpQZo-4R2EHYAAusMaxuMGhhR7uf1oZ4tinsBAAMCAAN5AAM6BA", "answer": "جمل"},
-    {"file_id": "AgACAgQAAxkBAAMgaaI5ePN3j5M93W0KFpdWHnuRDrsAAuoMaxuMGhhRPqDg5yB2_VEBAAMCAAN5AAM6BA", "answer": "صومال"},
-    {"file_id": "AgACAgQAAxkBAAMfaaI5dJdwVfIH4gm9OJVo02xp_vEAAukMaxuMGhhRso71yFdg_AwBAAMCAAN5AAM6BA", "answer": "ذباب"},
-    {"file_id": "AgACAgQAAxkBAAMeaaI5caGA2H-auwQ2GI8_r2QsrCYAAugMaxuMGhhRtSklpx7TQo8BAAMCAAN5AAM6BA", "answer": "العلم نور"},
-    {"file_id": "AgACAgQAAxkBAAMZaaI4LSRSmDV441m150RrXK7JzMAAAuQMaxuMGhhRGG-0KFHUUDUBAAMCAAN5AAM6BA", "answer": "سكوتك من ذهب"}
-]
+# 🖼️ دالة قراءة صور الألعاب من الملف الخارجي
+def load_image_quiz():
+    quiz_data = []
+    if os.path.exists('images.txt'):
+        with open('images.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and '=' in line:
+                    f_id, ans = line.split('=', 1)
+                    quiz_data.append({"file_id": f_id, "answer": ans})
+    return quiz_data
+
+# تحميل القائمة عند تشغيل البوت
+IMAGE_QUIZ = load_image_quiz()
 
 def get_main_menu_keyboard():
     keyboard = [
@@ -45,11 +52,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    # 2. فحص أوامر البنك
+    # 2. فحص أوامر البنك (الأولوية للراتب والزرف)
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
-    # 3. فحص إجابة الصور (نقاط صور مستقلة)
+    # 3. فحص إجابة الصور
     img_ans = context.chat_data.get('img_ans')
     if img_ans and text == img_ans:
         new_img_pts = u_data.get('image_points', 0) + 1
@@ -58,7 +65,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['img_ans'] = None
         return
 
-    # 4. ملك التفاعل
+    # 4. ملك التفاعل (توب 10 + عداد الـ 1000)
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -74,7 +81,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.update({'msg_count': 0}, User.id == u_id)
         return
 
-    # 5. توب صور
+    # 5. توب صور (داش سكور الصور)
     if text == "توب صور":
         all_u = db.all()
         top_img = sorted(all_u, key=lambda x: x.get('image_points', 0), reverse=True)[:10]
@@ -85,7 +92,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg if "⮕" in msg else "لا يوجد متصدرين في الصور بعد!")
         return
 
-    # 6. الروليت
+    # 6. نظام الروليت
     if text == "روليت":
         admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
         if u_id == OWNER_ID or u_id in admins:
@@ -114,8 +121,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['r_on'] = False
         return
 
-    # 7. تشغيل الألعاب
+    # 7. تشغيل الألعاب (نص وصور)
     if text == "صور":
+        if not IMAGE_QUIZ:
+            await update.message.reply_text("⚠️ لا توجد صور في الملف حالياً!")
+            return
         quiz = random.choice(IMAGE_QUIZ)
         context.chat_data['img_ans'] = quiz['answer']
         await context.bot.send_photo(chat_id=update.effective_chat.id, photo=quiz['file_id'], caption="🎮 **لعبة الصور الملكية بدأت!**\n\nماذا تعني هذه الصورة؟")
@@ -130,11 +140,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"🎮 **بدأت {text}**:\n【 {q['question']} 】")
             return
 
-    # 8. التحقق من الإجابة النصية (50,000 دينار ونقطة)
+    # 8. التحقق من الإجابة النصية
     correct_ans = context.chat_data.get('game_ans')
     if correct_ans and text == str(correct_ans):
         db.update({'balance': u_data['balance'] + 50000, 'points': u_data['points'] + 1}, User.id == u_id)
-        await update.message.reply_text(f"✅ **صح!** {u_name} فزت بـ 50,000 دينار.")
+        await update.message.reply_text(f"✅ **صح!** {u_name} فزت بـ 50,000 دينار ونقطة.")
         context.chat_data['game_ans'] = None
         return
 
@@ -146,6 +156,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if query.data == "run_image_game":
+        if not IMAGE_QUIZ:
+            await query.message.reply_text("⚠️ لا توجد صور مضافة!")
+            return
         quiz = random.choice(IMAGE_QUIZ)
         context.chat_data['img_ans'] = quiz['answer']
         await context.bot.send_photo(chat_id=update.effective_chat.id, photo=quiz['file_id'], caption="🎮 **لعبة الصور الملكية**\nماذا تعني هذه الصورة؟")
