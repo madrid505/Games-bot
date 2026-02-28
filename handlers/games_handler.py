@@ -52,11 +52,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    # 2. فحص أوامر البنك (تعمل بكفاءة قصوى)
+    # 2. فحص أوامر البنك
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
-    # 3. فحص إجابة الصور (مع الوقت المستغرق)
+    # 3. فحص إجابة الصور
     img_ans = context.chat_data.get('img_ans')
     if img_ans and text == img_ans:
         start_time = context.chat_data.get('img_start_time', time.time())
@@ -71,12 +71,16 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🏆 الجائزة: نقطة صور واحدة.\n"
             f"📊 مجموع نقاطك في الصور: {new_img_pts}"
         )
+        # تخزين بيانات الفوز للرجوع إليها
+        context.chat_data['last_win_msg'] = win_msg
+        context.chat_data['last_win_type'] = "images"
+        
         keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data="show_top_images")]]
         await update.message.reply_text(win_msg, reply_markup=InlineKeyboardMarkup(keyboard))
         context.chat_data['img_ans'] = None
         return
 
-    # 4. أوامر ملك التفاعل
+    # 4. ملك التفاعل
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -103,7 +107,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg if "⮕" in msg else "لا يوجد متصدرين في الصور بعد!")
         return
 
-    # 6. نظام الروليت (تكرار 'انا' مسموح للأبد)
+    # 6. نظام الروليت (تكرار 'انا' مسموح)
     if text == "روليت":
         admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
         if u_id == OWNER_ID or u_id in admins:
@@ -112,7 +116,6 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "انا" and context.chat_data.get('r_on'):
-        # إضافة الاسم مباشرة للقائمة دون فحص التكرار
         context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
         await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
         return
@@ -132,7 +135,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['r_on'] = False
         return
 
-    # 7. تشغيل الألعاب (صور وأسئلة)
+    # 7. تشغيل الألعاب
     if text == "صور":
         if not IMAGE_QUIZ: return
         quiz = random.choice(IMAGE_QUIZ)
@@ -164,6 +167,9 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📖 الجواب : {correct_ans}\n"
             f"💰 الجائزة : 50,000 دينار + 1 نقطة"
         )
+        context.chat_data['last_win_msg'] = win_text
+        context.chat_data['last_win_type'] = "general"
+        
         keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data="show_top_general")]]
         await update.message.reply_text(win_text, reply_markup=InlineKeyboardMarkup(keyboard))
         context.chat_data['game_ans'] = None
@@ -173,7 +179,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑", reply_markup=get_main_menu_keyboard())
         return
 
-# --- معالج ضغطات الأزرار (دفتر النتائج) ---
+# --- معالج الأزرار المطور بالرجوع التفاعلي ---
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -190,14 +196,19 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🔹"
             msg += f"{medal} {i+1}- {user.get('name', 'لاعب')} ⮕ {user.get(sort_key, 0)}\n"
         
-        # الأزرار: تثبيت السجل يحذف الأزرار فقط ويبقي النص للجميع
-        keyboard = [[InlineKeyboardButton("✅ تثبيت السجل للجميع", callback_data="fix_result")]]
+        # زر الرجوع لرسالة الفوز الأصلية
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_win")]]
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    if data == "fix_result":
-        # حذف الأزرار فقط وترك القائمة ثابتة في القروب
-        await query.edit_message_reply_markup(reply_markup=None)
+    # زر الرجوع: يعيد النص الأصلي للفوز وزر "رؤية دفتر النتائج"
+    if data == "back_to_win":
+        original_msg = context.chat_data.get('last_win_msg', "✅ تمت الإجابة بنجاح!")
+        win_type = context.chat_data.get('last_win_type', "general")
+        callback_val = "show_top_images" if win_type == "images" else "show_top_general"
+        
+        keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data=callback_val)]]
+        await query.edit_message_text(original_msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     if data == "run_image_game":
