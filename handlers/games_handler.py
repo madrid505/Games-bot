@@ -4,7 +4,6 @@ import time
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from db import get_user_data, db, User
-# ملاحظة: تأكد من أن get_top_users مضافة في ملف db.py لديك
 from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
@@ -49,15 +48,15 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
 
-    # 1. تحديث المشاركات
+    # 1. تحديث المشاركات (ملك التفاعل)
     current_msgs = u_data.get('msg_count', 0) + 1
     db.update({'msg_count': current_msgs}, User.id == u_id)
 
-    # 2. فحص أوامر البنك (الراتب والزرف)
+    # 2. فحص أوامر البنك (تعمل بكفاءة قصوى)
     if await handle_bank(update, u_data, text, u_name, u_id):
         return
 
-    # 3. فحص إجابة الصور (مع الوقت ودفتر النتائج)
+    # 3. فحص إجابة الصور (مع الوقت المستغرق)
     img_ans = context.chat_data.get('img_ans')
     if img_ans and text == img_ans:
         start_time = context.chat_data.get('img_start_time', time.time())
@@ -77,7 +76,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['img_ans'] = None
         return
 
-    # 4. ملك التفاعل
+    # 4. أوامر ملك التفاعل
     if text == "ملك التفاعل":
         all_u = db.all()
         top_active = sorted(all_u, key=lambda x: x.get('msg_count', 0), reverse=True)[:10]
@@ -104,7 +103,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg if "⮕" in msg else "لا يوجد متصدرين في الصور بعد!")
         return
 
-    # 6. نظام الروليت (التكرار مسموح للأبد ✅)
+    # 6. نظام الروليت (تكرار 'انا' مسموح للأبد)
     if text == "روليت":
         admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
         if u_id == OWNER_ID or u_id in admins:
@@ -113,7 +112,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "انا" and context.chat_data.get('r_on'):
-        # تم حذف شرط التحقق من التكرار بناءً على طلب الملك
+        # إضافة الاسم مباشرة للقائمة دون فحص التكرار
         context.chat_data['r_players'].append({'id': u_id, 'name': u_name})
         await update.message.reply_text(f"📢🔥🌹 لقد تم تسجيلك يا بطل {u_name} 🌹🔥📢")
         return
@@ -133,7 +132,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['r_on'] = False
         return
 
-    # 7. تشغيل الألعاب
+    # 7. تشغيل الألعاب (صور وأسئلة)
     if text == "صور":
         if not IMAGE_QUIZ: return
         quiz = random.choice(IMAGE_QUIZ)
@@ -174,6 +173,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"👑 **عالم مونوبولي العظيم** 👑", reply_markup=get_main_menu_keyboard())
         return
 
+# --- معالج ضغطات الأزرار (دفتر النتائج) ---
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -184,15 +184,20 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sort_key = 'image_points' if "images" in data else 'points'
         title = "🖼️ متصدري الصور" if "images" in data else "🏆 متصدري النقاط"
         top_u = sorted(all_u, key=lambda x: x.get(sort_key, 0), reverse=True)[:10]
+        
         msg = f"📊 **{title} - TOP 10** 📊\n\n"
         for i, user in enumerate(top_u):
-            msg += f"{i+1}- {user.get('name', 'لاعب')} ⮕ {user.get(sort_key, 0)}\n"
-        keyboard = [[InlineKeyboardButton("🔙 إغلاق", callback_data="close_result")]]
+            medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🔹"
+            msg += f"{medal} {i+1}- {user.get('name', 'لاعب')} ⮕ {user.get(sort_key, 0)}\n"
+        
+        # الأزرار: تثبيت السجل يحذف الأزرار فقط ويبقي النص للجميع
+        keyboard = [[InlineKeyboardButton("✅ تثبيت السجل للجميع", callback_data="fix_result")]]
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    if data == "close_result":
-        await query.message.delete()
+    if data == "fix_result":
+        # حذف الأزرار فقط وترك القائمة ثابتة في القروب
+        await query.edit_message_reply_markup(reply_markup=None)
         return
 
     if data == "run_image_game":
