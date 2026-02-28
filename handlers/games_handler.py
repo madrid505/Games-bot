@@ -3,7 +3,7 @@ import os
 import time
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
-from db import get_user_data, db, User, add_to_album  # أضفنا add_to_album
+from db import get_user_data, db, User, add_to_album, update_card_counter  # أضفنا تحديث العداد
 from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
@@ -80,17 +80,31 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # منع اللاعبين من استخدام أوامر الألعاب إذا كانت مقفلة
-    if context.chat_data.get('games_locked') and text in ["صور", "روليت"] or text in QUESTIONS:
+    if context.chat_data.get('games_locked') and (text in ["صور", "روليت"] or text in game_map or text in QUESTIONS):
         if not is_admin:
             await update.message.reply_text("⚠️ **عذراً، الألعاب مقفلة حالياً من قبل الإدارة.**")
             return
 
-    # دالة توزيع بطاقات الألبوم (فرصة 20% عند الفوز)
-    async def distribute_card():
-        if random.random() < 0.20:
+    # 🏆 نظام توزيع بطاقات الألبوم (تراكمي - 5 نقاط)
+    async def distribute_card(user_data):
+        current_counter = user_data.get('card_counter', 0) + 1
+        
+        if current_counter >= 5:
+            # منح بطاقة عشوائية
             card_id = random.choice(list(SEASON_ALBUM.keys()))
+            card_name = SEASON_ALBUM[card_id]
             if add_to_album(u_id, card_id):
-                await update.message.reply_text(f"🌟 **مبروك!** حصلت على بطاقة نادرة للألبوم: `{SEASON_ALBUM[card_id]}`")
+                await update.message.reply_text(f"🌟 **مبروك يا بطل!** لقد جمعت 5 نقاط وحصلت على بطاقة ألبوم عشوائية:\n\n`{card_name}`\n\nتأكد منها في ألبومك! 📂")
+            else:
+                await update.message.reply_text(f"🌟 لقد حصلت على بطاقة `{card_name}` لكنها موجودة في ألبومك مسبقاً! حاول جمع 5 نقاط أخرى لبطاقة جديدة.")
+            
+            # تصفير العداد بعد المحاولة (سواء البطاقة جديدة أو مكررة)
+            update_card_counter(u_id, 0)
+        else:
+            # رسالة تحفيزية
+            update_card_counter(u_id, current_counter)
+            needed = 5 - current_counter
+            await update.message.reply_text(f"🎯 **إجابة ذهبية!** أنت الآن مؤهل للحصول على بطاقة جديدة في ألبوم مونوبولي.\n✨ استمر! فاضل لك **{needed}** نقاط فقط لتحصل على بطاقتك القادمة. 🔥")
 
     # 3. فحص إجابة الصور
     img_ans = context.chat_data.get('img_ans')
@@ -112,7 +126,10 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data="show_top_images")]]
         await update.message.reply_text(win_msg, reply_markup=InlineKeyboardMarkup(keyboard))
-        await distribute_card() # فرصة لربح بطاقة
+        
+        # استدعاء نظام النقاط التراكمي للبطاقات
+        await distribute_card(u_data)
+        
         context.chat_data['img_ans'] = None
         return
 
@@ -220,7 +237,10 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = [[InlineKeyboardButton("🏆 رؤية دفتر النتائج", callback_data="show_top_general")]]
         await update.message.reply_text(win_text, reply_markup=InlineKeyboardMarkup(keyboard))
-        await distribute_card() # فرصة لربح بطاقة
+        
+        # استدعاء نظام النقاط التراكمي للبطاقات (حتى في الأسئلة النصية لزيادة التنوع)
+        await distribute_card(u_data)
+        
         context.chat_data['game_ans'] = None
         return
 
