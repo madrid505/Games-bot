@@ -217,7 +217,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update_card_counter(u_id, 0)
         else:
             update_card_counter(u_id, current_counter)
-            await update.message.reply_text(f"🎯 **صح!** فاضل لك **{5 - current_counter}** نقاط للبطاقة القادمة. 🔥")
+            await update.message.reply_text(f"🎯 **صح!** باقي لك **{5 - current_counter}** نقاط للبطاقة القادمة. 🔥")
 
     # 📂 6. أمر ألبومي
     if text in ["ألبومي", "البومي"]:
