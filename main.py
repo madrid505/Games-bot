@@ -8,13 +8,10 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
-    # معالج الرسائل العادية (الألعاب، البنك، الروليت)
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
-    
-    # معالج الأزرار
     app.add_handler(CallbackQueryHandler(callback_handler))
     
-    print("👑 البوت شغال بكامل طاقته الملكية يا Anas!")
+    print("👑 البوت شغال بالملف الخارجي يا Anas!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
