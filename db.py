@@ -16,29 +16,44 @@ async def get_user_data(update):
             'name': update.effective_user.first_name,
             'balance': balance,
             'points': 0,
-            'image_points': 0,    # أضفنا حقل نقاط الصور
-            'msg_count': 0,       # أضفنا حقل ملك التفاعل
+            'image_points': 0,    
+            'msg_count': 0,       
             'roulette_wins': 0,
             'last_salary': 0,
-            'last_gift': 0
+            'last_gift': 0,
+            'album': []           # حقل الألبوم الجديد لتخزين صور الموسم
         }
         db.insert(u_data)
     
-    # تأكد من وجود الحقول الجديدة حتى للمستخدمين القدامى
+    # تأكد من وجود الحقول الجديدة حتى للمستخدمين القدامى (صيانة تلقائية)
     changed = False
-    if 'image_points' not in u_data:
-        u_data['image_points'] = 0
-        changed = True
-    if 'msg_count' not in u_data:
-        u_data['msg_count'] = 0
-        changed = True
+    fields = {
+        'image_points': 0,
+        'msg_count': 0,
+        'album': [],             # إضافة الألبوم للمستخدمين القدامى
+        'roulette_wins': 0
+    }
+    
+    for field, default_val in fields.items():
+        if field not in u_data:
+            u_data[field] = default_val
+            changed = True
+            
     if changed:
         db.update(u_data, User.id == user_id)
         
     return u_data
 
-# دالة جلب الترتيب (ضرورية لدفتر النتائج)
+# دالة لإضافة صورة للألبوم (تمنع التكرار في الألبوم نفسه)
+def add_to_album(user_id, photo_id):
+    u_data = db.get(User.id == user_id)
+    if u_data:
+        current_album = u_data.get('album', [])
+        if photo_id not in current_album:
+            current_album.append(photo_id)
+            db.update({'album': current_album}, User.id == user_id)
+            return True # تم الإضافة بنجاح
+    return False # الصورة موجودة مسبقاً
+
 def get_top_users(limit=10):
-    all_users = db.all()
-    # نرجع كل المستخدمين ليتم ترتيبهم داخل الـ handler حسب نوع اللعبة
-    return all_users
+    return db.all()
