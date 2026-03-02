@@ -8,19 +8,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 async def catch_ids(update, context):
     if not update.message: return
 
-    # 1. ميزة صيد الـ ID (للملك فقط عند إرسال صورة)
-    if update.message.photo and update.effective_user.id == OWNER_ID:
-        try:
-            photo_id = update.message.photo[-1].file_id
-            await update.message.reply_text(
-                f"✅ **تم صيد الـ ID بنجاح يا ملك:**\n\n`{photo_id}`\n\nاضغط على الكود لنسخه 👆",
-                parse_mode='Markdown'
-            )
-            # ننهي الدالة هنا إذا كان الهدف فقط صيد الصورة
-            return
-        except Exception as e:
-            logging.error(f"Error catching ID: {e}")
-
     # 2. تشغيل الأوامر الطبيعية (البنك، الألعاب، الألبوم) للرسائل النصية
     if update.message.text:
         await handle_messages(update, context)
