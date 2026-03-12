@@ -170,18 +170,31 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text in ["قائمة", "الاوامر", "الأوامر"]:
         await update.message.reply_text(f"👑 **قائمة أوامر {CONTEST_NAME}**", reply_markup=get_main_menu_keyboard(is_admin))
 
-# --- الدوال المساعدة والداشبورد ---
+# --- بداية الدالة ---
 async def initiate_guess(update, context, u_name):
-    try: await update.message.delete()
-    except: pass
-    bot_un = (await context.bot.get_me()).username
-    url = f"https://t.me/{bot_un}?start=guess_{update.effective_chat.id}"
-    keyboard = [[InlineKeyboardButton("🔐 اضغط لوضع الرقم في الخاص", url=url)]]
-    # استخدام رسالة بدء التخمين من الملف الملكي
-    await update.message.reply_text(
-        GUESS_INITIATE.format(u_name=u_name), 
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    """تبدأ عملية التخمين بإرسال زر الانتقال للخاص للمشرف"""
+    try:
+        # جلب معلومات البوت لبناء الرابط
+        bot_obj = await context.bot.get_me()
+        bot_un = bot_obj.username
+        
+        # بناء الرابط مع معرف المجموعة لبدء المحادثة في الخاص
+        url = f"https://t.me/{bot_un}?start=guess_{update.effective_chat.id}"
+        
+        # إنشاء الزر الملكي
+        keyboard = [[InlineKeyboardButton("🔐 اضغط لوضع الرقم في الخاص", url=url)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # الرد على رسالة المشرف (مع بقاء الرسالة الأصلية في القروب)
+        await update.message.reply_text(
+            GUESS_INITIATE.format(u_name=u_name), 
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        import logging
+        logging.error(f"Error in initiate_guess: {e}")
+# --- نهاية الدالة ---
+
 
 async def process_win(update, context, u_data, u_id, u_name, g_type):
     money = 50000
