@@ -4,17 +4,17 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from db import get_user_data, db, User
 from config import OWNER_ID
+from royal_messages import BANK_STATUS
 
 async def handle_bank(update: Update, u_data, text, u_name, u_id):
     parts = text.split()
     if not parts: return False
     cmd = parts[0].strip()
 
-    # 🏦 دالة إدارة الضرائب الملكية (تخصم 10% وتحولها للمالك Anas)
+    # 🏦 دالة إدارة الضرائب الملكية (تخصم 10% وتحولها للمالك)
     async def apply_tax(amount):
         tax = int(amount * 0.10)
         net_amount = amount - tax
-        # تحويل الضريبة للمالك تلقائياً
         owner_exists = db.get(User.id == OWNER_ID)
         if owner_exists:
             db.update({'balance': owner_exists.get('balance', 0) + tax}, User.id == OWNER_ID)
@@ -25,7 +25,6 @@ async def handle_bank(update: Update, u_data, text, u_name, u_id):
         now = time.time()
         
         if cmd == "راتب":
-            # الراتب كل 30 دقيقة (1800 ثانية)
             last_s = u_data.get('last_salary', 0)
             if now - last_s < 1800:
                 rem = int((1800 - (now - last_s)) / 60)
@@ -39,7 +38,7 @@ async def handle_bank(update: Update, u_data, text, u_name, u_id):
         
         elif cmd == "حظ":
             base_amt = random.randint(100000, 800000)
-            if random.random() < 0.4: # نسبة خسارة 40%
+            if random.random() < 0.4:
                 loss = base_amt // 2
                 db.update({'balance': max(0, u_data['balance'] - loss)}, User.id == u_id)
                 await update.message.reply_text(f"📉 **عثرة حظ:** تعثرت في السوق وفقدت {loss:,} دينار.")
@@ -72,11 +71,11 @@ async def handle_bank(update: Update, u_data, text, u_name, u_id):
             await update.message.reply_text("❌ **فشل العملية:** رصيدك لا يكفي لهذه المخاطرة.")
             return True
 
-        if random.random() > 0.5: # ربح 50%
+        if random.random() > 0.5:
             net_win, tax_amt = await apply_tax(amount)
             db.update({'balance': u_data['balance'] + net_win}, User.id == u_id)
             await update.message.reply_text(f"📈 **بورصة مونوبولي:** استثمار ناجح! ربحت {amount:,} د.\n⚖️ ضريبة (Anas): {tax_amt:,} د | الصافي: {net_win:,} د.")
-        else: # خسارة 50%
+        else:
             db.update({'balance': u_data['balance'] - amount}, User.id == u_id)
             await update.message.reply_text(f"📉 **انتكاسة:** خسر مشروعك {amount:,} دينار في ال{cmd}.")
         return True
@@ -101,16 +100,15 @@ async def handle_bank(update: Update, u_data, text, u_name, u_id):
 
     # --- 📊 الاستعلامات والترتيب ---
     if text == "رصيدي":
-        # عرض الرصيد مع نقاط الألعاب المختلفة ليكون أشمل
-        await update.message.reply_text(
-            f"🏦 **مصرف إمبراطورية مونوبولي**\n━━━━━━━━━━━━━━\n"
-            f"👤 **الاسم:** {u_name}\n"
-            f"💰 **الرصيد:** {u_data['balance']:,} د\n"
-            f"🏆 **نقاط الثقافة:** {u_data.get('points', 0)}\n"
-            f"🖼️ **نقاط الصور:** {u_data.get('image_points', 0)}\n"
-            f"👑 **نقاط التفاعل:** {u_data.get('weekly_pts', 0)}\n"
-            f"━━━━━━━━━━━━━━"
+        # الربط مع القالب الملكي من ملف royal_messages.py
+        msg = BANK_STATUS.format(
+            u_name=u_name,
+            balance=u_data['balance'],
+            points=u_data.get('points', 0),
+            img_points=u_data.get('image_points', 0),
+            weekly_pts=u_data.get('weekly_pts', 0)
         )
+        await update.message.reply_text(msg)
         return True
 
     if text in ["توب", "توب الاغنياء"]:
@@ -130,7 +128,7 @@ async def handle_bank(update: Update, u_data, text, u_name, u_id):
             db.update({'balance': t_data['balance'] - amt}, User.id == target.id)
             await update.message.reply_text(f"🥷 **عملية احترافية:** زرفت {amt:,} من {target.first_name}!")
         else:
-            await update.message.reply_text("❌ **فشل الزرف:** الضحية لا تملك ما يكفي أو " "أنها تحت حماية المملكة!")
+            await update.message.reply_text("❌ **فشل الزرف:** الضحية لا تملك ما يكفي أو أنها تحت حماية المملكة!")
         return True
 
     return False
