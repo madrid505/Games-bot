@@ -1,7 +1,8 @@
 import logging
 import random
 import asyncio
-from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, CommandHandler, filters
+import os  # إضافة مكتبة النظام
+from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, CommandHandler, filters, PicklePersistence # إضافة Persistence
 from config import BOT_TOKEN, OWNER_ID, GROUP_IDS
 from handlers.games_handler import handle_messages, callback_handler
 from telegram import Update
@@ -100,11 +101,20 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_messages(update, context)
 
 def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    # --- إعداد مسار الحفظ لضمان عدم التداخل ---
+    volume_path = "/app/data"
+    games_dir = os.path.join(volume_path, "games_data")
+    if not os.path.exists(games_dir):
+        os.makedirs(games_dir)
+    
+    # تفعيل نظام الحفظ الدائم
+    persistence = PicklePersistence(filepath=os.path.join(games_dir, "games_persistence"))
+
+    app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), catch_ids))
     app.add_handler(CallbackQueryHandler(callback_handler))
-    print("👑 إمبراطورية مونوبولي تعمل الآن بالنظام المطور (تذكير كل 10ث + مدى 60 رقم)..")
+    print("👑 إمبراطورية مونوبولي تعمل الآن بالنظام المطور (تذكير كل 10ث + مدى 60 رقم + حفظ دائم)..")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
