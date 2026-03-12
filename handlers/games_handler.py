@@ -10,7 +10,14 @@ from db import get_user_data, db, User, update_card_counter
 from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
-from royal_messages import WEEKLY_KINGS_DASHBOARD, GUESS_WINNER, CARD_WIN, GUESS_INITIATE
+from royal_messages import (
+    WEEKLY_KINGS_DASHBOARD, 
+    GUESS_WINNER, 
+    CARD_WIN, 
+    GUESS_INITIATE, 
+    ALBUM_DISPLAY,
+    BANK_STATUS
+)
 
 # 🏷️ الإعدادات الأساسية
 CONTEST_NAME = "مسابقة قروب مونوبولي"
@@ -108,7 +115,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. أوامر البنك الملكي
     if await handle_bank(update, u_data, text, u_name, u_id): return
 
-    # 3. نظام "أضف تخمين" (بصيغة التحفيز)
+    # 3. نظام "أضف تخمين" (مربوط بالرسالة الملكية)
     if text == "اضف تخمين" and is_admin:
         await initiate_guess(update, context, u_name)
         return
@@ -118,7 +125,8 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del context.bot_data[f"guess_ans_{update.effective_chat.id}"]
         prize = 100000
         db.update({'balance': u_data['balance'] + prize, 'weekly_pts': u_data.get('weekly_pts', 0) + 15}, User.id == u_id)
-        await update.message.reply_text(f"🎉 **كفووو يا بطل! لقد فزت!** 🎉\n━━━━━━━━━━━━━━\n🎯 الرقم الصحيح كان: **{text}**\n👤 الفائز: {u_name}\n💰 الجائزة: {prize:,} دينار + 15 نقطة تفاعل\n━━━━━━━━━━━━━━")
+        # استخدام رسالة الفوز من الملف الملكي
+        await update.message.reply_text(GUESS_WINNER.format(text=text, u_name=u_name, prize=prize))
         return
 
     # 4. أوامر الإدارة
@@ -131,13 +139,14 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "ملوك التفاعل":
         await send_weekly_dashboard(update, context); return
 
-    # 5. الألبوم
+    # 5. الألبوم الملكي (مربوط بالرسالة الملكية)
     if text in ["ألبومي", "البومي"]:
         alb = u_data.get('album', [])
-        msg = f"📂 **ألبوم {CONTEST_NAME}** 📂\n\n"
+        cards_status = ""
         for cid, cname in SEASON_ALBUM.items():
-            msg += f"{'✅' if alb.count(cid) > 0 else '❌'} - {cname} (تملك {alb.count(cid)})\n"
-        await update.message.reply_text(msg); return
+            cards_status += f"{'✅' if alb.count(cid) > 0 else '❌'} - {cname} (تملك {alb.count(cid)})\n"
+        await update.message.reply_text(ALBUM_DISPLAY.format(cards_status=cards_status))
+        return
 
     # 6. تشغيل الألعاب والداشبورد لكل لعبة
     if not context.chat_data.get('games_locked') or is_admin:
@@ -168,13 +177,9 @@ async def initiate_guess(update, context, u_name):
     bot_un = (await context.bot.get_me()).username
     url = f"https://t.me/{bot_un}?start=guess_{update.effective_chat.id}"
     keyboard = [[InlineKeyboardButton("🔐 اضغط لوضع الرقم في الخاص", url=url)]]
+    # استخدام رسالة بدء التخمين من الملف الملكي
     await update.message.reply_text(
-        f"🏰 **مملكة مونوبولي - مسابقة التخمين** 🏰\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"📥 **يا {u_name}**، تم فتح الخزنة..\n"
-        f"اضغط على الزر بالأسفل لوضع الرقم السري بعيداً عن أعين الاعضاء! 🔥\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"🗣️ **يا شعب مونوبولي.. استعدوا للتخمين بمجرد وضع الرقم!**", 
+        GUESS_INITIATE.format(u_name=u_name), 
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -201,7 +206,8 @@ async def distribute_card(update, u_id):
         cid = random.choice(list(SEASON_ALBUM.keys()))
         alb = u.get('album', []); alb.append(cid)
         db.update({'album': alb, 'card_counter': 0}, User.id == u_id)
-        await update.message.reply_text(f"🌟 **مبروك!** حصلت على بطاقة ملكية: `{SEASON_ALBUM[cid]}` 📂")
+        # استخدام رسالة الفوز بالبطاقة من الملف الملكي
+        await update.message.reply_text(CARD_WIN.format(card_name=SEASON_ALBUM[cid]))
     else:
         db.update({'card_counter': count}, User.id == u_id)
 
@@ -211,14 +217,16 @@ async def send_weekly_dashboard(update, context):
     players = [u for u in db.all() if u.get('id') not in admins]
     top = sorted(players, key=lambda x: x.get('weekly_pts', 0), reverse=True)[:5]
     
-    msg = "👑 **لوحة ملوك التفاعل الأسبوعية** 👑\n━━━━━━━━━━━━━━\n"
     emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+    top_list_text = ""
     for i, user in enumerate(top):
-        msg += f"{emojis[i]} **{user.get('name')}** ⮕ `{user.get('weekly_pts', 0)}` نقطة\n"
-    msg += "━━━━━━━━━━━━━━\n🔥 *استمروا في التفاعل للوصول للقمة!*"
+        top_list_text += f"{emojis[i]} **{user.get('name')}** ⮕ `{user.get('weekly_pts', 0):,}` نقطة\n"
     
-    if update.message: await update.message.reply_text(msg)
-    else: await update.callback_query.message.reply_text(msg)
+    # الربط مع قالب المراكز الخمسة في الملف الملكي
+    final_msg = WEEKLY_KINGS_DASHBOARD.format(top_list=top_list_text)
+    
+    if update.message: await update.message.reply_text(final_msg)
+    else: await update.callback_query.message.reply_text(final_msg)
 
 async def broadcast_weekly_kings(update, context):
     await send_weekly_dashboard(update, context)
@@ -228,7 +236,19 @@ async def broadcast_weekly_kings(update, context):
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query; data = query.data; await query.answer()
     
-    if data.startswith("show_top_"):
+    if data == "cmd_balance":
+        u_data = await get_user_data(query)
+        # استخدام قالب الرصيد الملكي من الملف
+        msg = BANK_STATUS.format(
+            u_name=query.from_user.first_name,
+            balance=u_data['balance'],
+            points=u_data.get('points', 0),
+            img_points=u_data.get('image_points', 0),
+            weekly_pts=u_data.get('weekly_pts', 0)
+        )
+        await query.message.reply_text(msg)
+
+    elif data.startswith("show_top_"):
         all_u = db.all()
         sort_key = 'image_points' if "images" in data else 'points'
         top_u = sorted(all_u, key=lambda x: x.get(sort_key, 0), reverse=True)[:10]
