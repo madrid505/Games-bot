@@ -106,20 +106,15 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
     
-        # --- 👑 تسجيل نقاط التفاعل التلقائي (للأعضاء فقط) ---
+    # 👑 [تعديل هام] تعريف الصلاحيات في البداية لتجنب خطأ UnboundLocalError
+    admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
+    is_admin = u_id == OWNER_ID or u_id in admins
+
+    # --- 👑 تسجيل نقاط التفاعل التلقائي (للأعضاء فقط) ---
     if not is_admin:
         new_weekly_pts = u_data.get('weekly_pts', 0) + 1
         db.update({'weekly_pts': new_weekly_pts}, User.id == u_id)
     # -----------------------------------------------
-
-    # -----------------------------------------------
-
-    admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
-    is_admin = u_id == OWNER_ID or u_id in admins
-
-    # 2. أوامر البنك الملكي
-    if await handle_bank(update, u_data, text, u_name, u_id): return
-
 
     # 2. أوامر البنك الملكي
     if await handle_bank(update, u_data, text, u_name, u_id): return
@@ -129,13 +124,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await initiate_guess(update, context, u_name)
         return
 
-            # 3. نظام التخمين ونظام الـ 5 فوزات (إصلاح شامل)
+    # 3. نظام التخمين ونظام الـ 5 فوزات (إصلاح شامل)
     active_g = context.bot_data.get(f"guess_ans_{update.effective_chat.id}")
     if active_g is not None and str(text) == str(active_g):
-        # إغلاق اللعبة
         del context.bot_data[f"guess_ans_{update.effective_chat.id}"]
         
-        # حساب الجوائز والانتصارات التراكمية
         prize = 100000
         current_wins = u_data.get('guess_wins', 0) + 1
         db.update({
@@ -144,7 +137,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'guess_wins': current_wins
         }, User.id == u_id)
 
-        # التحقق من لقب "الملك" عند الفوز الخامس
+        # التحقق من لقب "الإمبراطور" عند الفوز الخامس
         if current_wins >= 5:
             db.update({'guess_wins': 0, 'balance': u_data['balance'] + 500000}, User.id == u_id)
             magic_winner = (
@@ -152,19 +145,16 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"━━━━━━━━━━━━━━\n"
                 f"ألف مبروك للأسطورة **{u_name}**!\n"
                 f"بعد تحقيق 5 انتصارات متتالية، تفتح لك أبواب الخزنة الملكية.\n\n"
-                f"🎖️ **اللقب:** ملك التخمين الأسبوعي\n"
+                f"🎖️ **اللقب:** إمبراطور التخمين\n"
                 f"💰 **جائزة اللقب:** 500,000 دينار إضافية\n"
                 f"━━━━━━━━━━━━━━\n"
                 f"✨ تم تصفير نتائجك لتبدأ رحلة ملكية جديدة!"
             )
             await update.message.reply_text(magic_winner)
         else:
-            # رسالة الفوز العادية مع العداد
             win_msg = GUESS_WINNER.format(text=text, u_name=u_name, prize=prize)
             await update.message.reply_text(f"{win_msg}\n\n📊 **التقدم نحو الملك:** `{current_wins}/5` فوزات")
         return
-
-
 
     # 4. أوامر الإدارة
     if text == "قفل الالعاب" and is_admin:
@@ -176,7 +166,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "ملوك التفاعل":
         await send_weekly_dashboard(update, context); return
 
-    # 5. الألبوم الملكي (مربوط بالرسالة الملكية)
+    # 5. الألبوم الملكي
     if text in ["ألبومي", "البومي"]:
         alb = u_data.get('album', [])
         cards_status = ""
@@ -185,7 +175,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(ALBUM_DISPLAY.format(cards_status=cards_status))
         return
 
-    # 6. تشغيل الألعاب والداشبورد لكل لعبة
+    # 6. تشغيل الألعاب
     if not context.chat_data.get('games_locked') or is_admin:
         if context.chat_data.get('img_ans') == text:
             await process_win(update, context, u_data, u_id, u_name, "images"); return
@@ -206,6 +196,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text in ["قائمة", "الاوامر", "الأوامر"]:
         await update.message.reply_text(f"👑 **قائمة أوامر {CONTEST_NAME}**", reply_markup=get_main_menu_keyboard(is_admin))
+
 
 async def initiate_guess(update, context, u_name):
     """تبدأ عملية التخمين مع منع التداخل وحماية الزر للمشرف فقط"""
