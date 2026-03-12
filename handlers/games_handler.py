@@ -30,7 +30,8 @@ def check_and_reset_timers():
     # تصفير الموسم (30 يوم)
     s_file = "season_start.txt"
     if os.path.exists(s_file):
-        with open(s_file, "r") as f: start_date = datetime.strptime(f.read().strip(), "%Y-%m-%d")
+        with open(s_file, "r") as f: 
+            start_date = datetime.strptime(f.read().strip(), "%Y-%m-%d")
         if now >= start_date + timedelta(days=SEASON_DURATION_DAYS):
             db.update({'album': [], 'card_counter': 0}, User.id.exists())
             with open(s_file, "w") as f: f.write(now.strftime("%Y-%m-%d"))
@@ -40,7 +41,8 @@ def check_and_reset_timers():
     # تصفير ملوك التفاعل أسبوعياً (7 أيام)
     w_file = "weekly_reset.txt"
     if os.path.exists(w_file):
-        with open(w_file, "r") as f: last_r = datetime.strptime(f.read().strip(), "%Y-%m-%d")
+        with open(w_file, "r") as f: 
+            last_r = datetime.strptime(f.read().strip(), "%Y-%m-%d")
         if now >= last_r + timedelta(days=7):
             with open(w_file, "w") as f: f.write(now.strftime("%Y-%m-%d"))
             return True
@@ -81,7 +83,7 @@ def get_main_menu_keyboard(is_admin=False):
         [InlineKeyboardButton("👑 ملوك التفاعل", callback_data="cmd_top_weekly"), InlineKeyboardButton("💰 الرصيد", callback_data="cmd_balance")]
     ]
     if is_admin:
-        keyboard.append([InlineKeyboardButton("🎯 أضف تخمين", callback_data="admin_add_guess")])
+        keyboard.append([InlineKeyboardButton("🎯 أضف تخمين (إداري)", callback_data="admin_add_guess")])
     return InlineKeyboardMarkup(keyboard)
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -138,21 +140,17 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 6. تشغيل الألعاب والداشبورد لكل لعبة
     if not context.chat_data.get('games_locked') or is_admin:
-        # إجابات الصور
         if context.chat_data.get('img_ans') == text:
             await process_win(update, context, u_data, u_id, u_name, "images"); return
         
-        # إجابات النصوص
         if str(context.chat_data.get('game_ans')) == text:
             await process_win(update, context, u_data, u_id, u_name, "general"); return
 
-        # بدء ألعاب الصور
         if text == "صور" and IMAGE_QUIZ:
             q = random.choice(IMAGE_QUIZ)
             context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
             await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**"); return
 
-        # ألعاب المعلومات العامة
         game_map = {"إسلاميات": "islamic", "ثقافة عامة": "general", "سيارات": "cars", "أندية": "clubs", "عواصم": "countries", "أعلام": "flags", "عكس": "reverse", "ترتيب": "order", "تفكيك": "decompose", "رياضيات": "math", "إنجليزي": "english", "كلمات": "words", "مختلف": "misc"}
         if text in game_map:
             q = random.choice(QUESTIONS[game_map[text]])
@@ -164,7 +162,8 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- الدوال المساعدة والداشبورد ---
 async def initiate_guess(update, context, u_name):
-    await update.message.delete()
+    try: await update.message.delete()
+    except: pass
     bot_un = (await context.bot.get_me()).username
     url = f"https://t.me/{bot_un}?start=guess_{update.effective_chat.id}"
     keyboard = [[InlineKeyboardButton("🔐 اضغط لوضع الرقم في الخاص", url=url)]]
@@ -180,19 +179,17 @@ async def initiate_guess(update, context, u_name):
 
 async def process_win(update, context, u_data, u_id, u_name, g_type):
     money = 50000
-    db.update({'balance': u_data['balance'] + money, 'points': u_data.get('points', 0) + 1}, User.id == u_id)
+    new_img_pts = u_data.get('image_points', 0) + (1 if g_type == "images" else 0)
+    db.update({'balance': u_data['balance'] + money, 'points': u_data.get('points', 0) + 1, 'image_points': new_img_pts}, User.id == u_id)
     
-    # نقاط التفاعل للفوز
     if u_id not in [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]:
         db.update({'weekly_pts': u_data.get('weekly_pts', 0) + 2}, User.id == u_id)
     
     win_txt = f"✅ **صح يا أسطورة!** {u_name}\n💰 {money:,} دينار + 1 نقطة"
     context.chat_data.update({'last_win_msg': win_txt, 'last_win_type': g_type, 'game_ans': None, 'img_ans': None})
     
-    # زر الداشبورد (دفتر النتائج) الخاص باللعبة
     target_callback = "show_top_images" if g_type == "images" else "show_top_general"
     keyboard = [[InlineKeyboardButton("🏆 دفتر النتائج", callback_data=target_callback)]]
-    
     await update.message.reply_text(win_txt, reply_markup=InlineKeyboardMarkup(keyboard))
     await distribute_card(update, u_id)
 
@@ -222,10 +219,14 @@ async def send_weekly_dashboard(update, context):
     if update.message: await update.message.reply_text(msg)
     else: await update.callback_query.message.reply_text(msg)
 
+async def broadcast_weekly_kings(update, context):
+    await send_weekly_dashboard(update, context)
+    await context.bot.send_message(update.effective_chat.id, "🔄 **انتهى الأسبوع! تم تتويج الملوك وتصفير النقاط لسباق جديد.**")
+    db.update({'weekly_pts': 0}, User.id.exists())
+
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query; data = query.data; await query.answer()
     
-    # معالجة داشبورد الصور والنقاط
     if data.startswith("show_top_"):
         all_u = db.all()
         sort_key = 'image_points' if "images" in data else 'points'
@@ -242,12 +243,18 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "cmd_top_weekly": await send_weekly_dashboard(update, context)
     elif data == "admin_add_guess": await initiate_guess(query, context, query.from_user.first_name)
     
-    # بدء الألعاب من القائمة
     elif data == "run_image_game":
         if IMAGE_QUIZ:
             q = random.choice(IMAGE_QUIZ)
             context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
             await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**")
+            
+    elif data == "run_contest_game":
+        if CONTEST_QUIZ:
+            q = random.choice(CONTEST_QUIZ)
+            context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
+            await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🏆 **مسابقة الصور الملكية**\n💎 الندرة: {q.get('rarity', 'عادية')}")
+
     elif data.startswith("run_"):
         game = data.replace("run_", "")
         if game in QUESTIONS:
