@@ -4,6 +4,8 @@ from config import BOT_TOKEN, OWNER_ID, GROUP_IDS
 from handlers.games_handler import handle_messages, callback_handler
 from telegram import Update
 from telegram.ext import ContextTypes
+# استيراد الرسائل الملكية
+from royal_messages import GUESS_START_ANNOUNCEMENT
 
 # إعداد السجلات
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -44,17 +46,19 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await update.message.reply_text(f"✅ **تم اعتماد الرقم ({text}) بنجاح!**\nسيتمكن الأعضاء الآن من التخمين في المجموعة.")
             
-            # إرسال إشعار للمجموعة بأن المسابقة بدأت (اختياري)
+            # إرسال إشعار للمجموعة بأن المسابقة بدأت باستخدام القالب الملكي
             try:
                 await context.bot.send_message(
                     chat_id=target_chat_id, 
-                    text="🔥 **يا شعب مونوبولي.. تم وضع الرقم السري! انطلقوا بالتخمين الآن!**"
+                    text=GUESS_START_ANNOUNCEMENT
                 )
-            except: pass
+            except Exception as e:
+                logging.error(f"Error sending announcement: {e}")
             return
 
     # --- ثانياً: تشغيل الأوامر الطبيعية في القروبات المسموحة ---
     if update.effective_chat.id in GROUP_IDS or u_id == OWNER_ID:
+        # السماح بمعالجة النصوص والصور (لألعاب الصور)
         if update.message.text or update.message.photo:
             await handle_messages(update, context)
 
@@ -64,10 +68,10 @@ def main():
     # معالجة أمر start (ضروري لنظام التخمين)
     app.add_handler(CommandHandler("start", start))
     
-    # معالجة كافة الرسائل (نصوص وصور)
+    # معالجة كافة الرسائل (نصوص وصور) مع استثناء الأوامر لعدم التداخل
     app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), catch_ids))
     
-    # معالجة الأزرار (دفتر النتائج وغيرها)
+    # معالجة الأزرار (دفتر النتائج، الرصيد، ملوك التفاعل)
     app.add_handler(CallbackQueryHandler(callback_handler))
     
     print("👑 إمبراطورية مونوبولي تعمل الآن بنظام التخمين السري والداشبورد الملكي..")
