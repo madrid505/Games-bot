@@ -10,6 +10,7 @@ from db import get_user_data, db, User, update_card_counter
 from games.utils import load_questions
 from config import OWNER_ID, GROUP_IDS
 from handlers.bank_handler import handle_bank
+from royal_messages import WEEKLY_KINGS_DASHBOARD, GUESS_WINNER, CARD_WIN, GUESS_INITIATE
 
 # 🏷️ الإعدادات الأساسية
 CONTEST_NAME = "مسابقة قروب مونوبولي"
