@@ -106,9 +106,12 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
     
-    # --- 👑 تسجيل نقاط التفاعل التلقائي (لكل رسالة) ---
-    new_weekly_pts = u_data.get('weekly_pts', 0) + 1
-    db.update({'weekly_pts': new_weekly_pts}, User.id == u_id)
+        # --- 👑 تسجيل نقاط التفاعل التلقائي (للأعضاء فقط) ---
+    if not is_admin:
+        new_weekly_pts = u_data.get('weekly_pts', 0) + 1
+        db.update({'weekly_pts': new_weekly_pts}, User.id == u_id)
+    # -----------------------------------------------
+
     # -----------------------------------------------
 
     admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
@@ -205,34 +208,32 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"👑 **قائمة أوامر {CONTEST_NAME}**", reply_markup=get_main_menu_keyboard(is_admin))
 
 async def initiate_guess(update, context, u_name):
-    """تبدأ عملية التخمين مع منع التداخل وبقاء الرسالة في المجموعة"""
+    """تبدأ عملية التخمين مع منع التداخل وحماية الزر للمشرف فقط"""
     chat_id = update.effective_chat.id
+    u_id = update.effective_user.id
     
-    # 🚫 الإضافة الجديدة: التحقق إذا كانت هناك لعبة صور أو أسئلة تعمل حالياً
-    if context.chat_data.get('img_ans') or context.chat_data.get('game_ans'):
-        await update.message.reply_text("⚠️ **عفواً سيادة المشرف:** لا يمكن بدء مسابقة التخمين وهناك لعبة أخرى قائمة حالياً!")
+    # 🚫 التحقق من وجود لعبة صور أو أسئلة أو تخمين نشط حالياً
+    if context.chat_data.get('img_ans') or context.chat_data.get('game_ans') or context.bot_data.get(f"guess_ans_{chat_id}"):
+        await update.message.reply_text("⚠️ **عفواً سيادة المشرف:** لا يمكن بدء مسابقة تخمين جديدة وهناك لعبة قائمة حالياً!")
         return
 
     try:
-        # جلب معلومات البوت لبناء الرابط
+        # جلب معلومات البوت
         bot_obj = await context.bot.get_me()
-        bot_un = bot_obj.username
         
-        # بناء الرابط
-        url = f"https://t.me/{bot_un}?start=guess_{chat_id}"
+        # بناء الرابط مع إضافة ID المشرف لضمان الصلاحية في الخاص لاحقاً
+        url = f"https://t.me/{bot_obj.username}?start=guess_{chat_id}_{u_id}"
         
-        # إنشاء الزر الملكي
         keyboard = [[InlineKeyboardButton("🔐 اضغط لوضع الرقم في الخاص", url=url)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # ✅ التحديث الذي أجريناه سابقاً: الرد مباشرة مع بقاء الرسالة الأصلية
         await update.message.reply_text(
             GUESS_INITIATE.format(u_name=u_name), 
-            reply_markup=reply_markup
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     except Exception as e:
         import logging
         logging.error(f"Error in initiate_guess: {e}")
+
 
 
 
@@ -266,8 +267,13 @@ async def distribute_card(update, u_id):
 
 async def send_weekly_dashboard(update, context):
     chat_id = update.effective_chat.id
+    # جلب قائمة المشرفين والمالك
     admins = [a.user.id for a in await context.bot.get_chat_administrators(chat_id)]
-    players = [u for u in db.all() if u.get('id') not in admins]
+    
+    # جلب جميع المستخدمين واستبعاد المشرفين والمالك من القائمة
+    players = [u for u in db.all() if u.get('id') not in admins and u.get('id') != OWNER_ID]
+    
+    # ترتيب اللاعبين بناءً على نقاط التفاعل الأسبوعية
     top = sorted(players, key=lambda x: x.get('weekly_pts', 0), reverse=True)[:5]
     
     emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
@@ -275,11 +281,13 @@ async def send_weekly_dashboard(update, context):
     for i, user in enumerate(top):
         top_list_text += f"{emojis[i]} **{user.get('name')}** ⮕ `{user.get('weekly_pts', 0):,}` نقطة\n"
     
-    # الربط مع قالب المراكز الخمسة في الملف الملكي
     final_msg = WEEKLY_KINGS_DASHBOARD.format(top_list=top_list_text)
     
-    if update.message: await update.message.reply_text(final_msg)
-    else: await update.callback_query.message.reply_text(final_msg)
+    if update.message: 
+        await update.message.reply_text(final_msg)
+    else: 
+        await update.callback_query.message.reply_text(final_msg)
+
 
 async def broadcast_weekly_kings(update, context):
     await send_weekly_dashboard(update, context)
