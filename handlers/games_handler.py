@@ -83,16 +83,49 @@ IMAGE_QUIZ = load_image_quiz()
 CONTEST_QUIZ = load_contest_images()
 
 def get_main_menu_keyboard(is_admin=False):
+    # قائمة الأزرار مرتبة بشكل ملكي وأنيق
     keyboard = [
-        [InlineKeyboardButton("🖼️ لعبة الصور", callback_data="run_image_game"), InlineKeyboardButton("🏆 مسابقة الصور", callback_data="run_contest_game")],
-        [InlineKeyboardButton("🕋 إسلاميات", callback_data="run_islamic"), InlineKeyboardButton("💡 ثقافة عامة", callback_data="run_general")],
-        [InlineKeyboardButton("🏎️ سيارات", callback_data="run_cars"), InlineKeyboardButton("⚽ أندية", callback_data="run_clubs")],
-        [InlineKeyboardButton("🌍 عواصم", callback_data="run_countries"), InlineKeyboardButton("🚩 أعلام", callback_data="run_flags")],
-        [InlineKeyboardButton("👑 ملوك التفاعل", callback_data="cmd_top_weekly"), InlineKeyboardButton("💰 الرصيد", callback_data="cmd_balance")]
+        [
+            InlineKeyboardButton("🏆 مسابقة الصور", callback_data="run_pics"), 
+            InlineKeyboardButton("🖼️ لعبة الصور", callback_data="run_pics")
+        ],
+        [
+            InlineKeyboardButton("💡 ثقافة عامة", callback_data="run_general"), 
+            InlineKeyboardButton("🕋 إسلاميات", callback_data="run_islamic")
+        ],
+        [
+            InlineKeyboardButton("⚽ أندية", callback_data="run_clubs"), 
+            InlineKeyboardButton("🏎️ سيارات", callback_data="run_cars")
+        ],
+        [
+            InlineKeyboardButton("🚩 أعلام", callback_data="run_flags"), 
+            InlineKeyboardButton("🌍 عواصم", callback_data="run_countries")
+        ],
+        # الألعاب التي كانت مفقودة في اللوحة السابقة:
+        [
+            InlineKeyboardButton("🔄 عكس", callback_data="run_reverse"), 
+            InlineKeyboardButton("🧩 تفكيك", callback_data="run_decompose")
+        ],
+        [
+            InlineKeyboardButton("🔢 ترتيب", callback_data="run_order"),
+            InlineKeyboardButton("➕ رياضيات", callback_data="run_math")
+        ],
+        [
+            InlineKeyboardButton("🔡 إنجليزي", callback_data="run_english"), 
+            InlineKeyboardButton("📝 كلمات", callback_data="run_words")
+        ],
+        [
+            InlineKeyboardButton("💰 الرصيد", callback_data="check_balance"), 
+            InlineKeyboardButton("👑 ملوك التفاعل", callback_data="leaderboard")
+        ]
     ]
+    
+    # إضافة زر التخمين في سطر منفصل للمشرفين فقط
     if is_admin:
-        keyboard.append([InlineKeyboardButton("🎯 أضف تخمين (إداري)", callback_data="admin_add_guess")])
+        keyboard.append([InlineKeyboardButton("🎯 أضف تخمين (إداري)", callback_data="admin_guess")])
+        
     return InlineKeyboardMarkup(keyboard)
+
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or update.effective_chat.id not in GROUP_IDS or not update.message or not update.message.text:
