@@ -1,2 +1,4 @@
+# 👑 متطلبات تشغيل إمبراطورية مونوبولي 2026
 python-telegram-bot==20.3
 tinydb==4.7.0
+python-dotenv==1.0.0
