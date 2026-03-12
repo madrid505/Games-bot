@@ -126,12 +126,13 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await initiate_guess(update, context, u_name)
         return
 
-        active_g = context.bot_data.get(f"guess_ans_{update.effective_chat.id}")
-    if active_g and text == str(active_g):
-        # 1. إغلاق اللعبة
+            # 3. نظام التخمين ونظام الـ 5 فوزات (إصلاح شامل)
+    active_g = context.bot_data.get(f"guess_ans_{update.effective_chat.id}")
+    if active_g is not None and str(text) == str(active_g):
+        # إغلاق اللعبة
         del context.bot_data[f"guess_ans_{update.effective_chat.id}"]
         
-        # 2. زيادة النقاط التراكمية (guess_wins) والمكافآت
+        # حساب الجوائز والانتصارات التراكمية
         prize = 100000
         current_wins = u_data.get('guess_wins', 0) + 1
         db.update({
@@ -140,11 +141,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'guess_wins': current_wins
         }, User.id == u_id)
 
-        # 3. التحقق من لقب "الملك" عند الفوز الخامس
+        # التحقق من لقب "الملك" عند الفوز الخامس
         if current_wins >= 5:
             db.update({'guess_wins': 0, 'balance': u_data['balance'] + 500000}, User.id == u_id)
             magic_winner = (
-                f"👑 **تتويج إمبراطور الخزنة الجديد** 👑\n"
+                f"👑 **تتويج إمبراطور التخمين الجديد** 👑\n"
                 f"━━━━━━━━━━━━━━\n"
                 f"ألف مبروك للأسطورة **{u_name}**!\n"
                 f"بعد تحقيق 5 فوزات متتالية، تفتح لك أبواب القصر الملكي.\n\n"
@@ -159,6 +160,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             win_msg = GUESS_WINNER.format(text=text, u_name=u_name, prize=prize)
             await update.message.reply_text(f"{win_msg}\n\n📊 **التقدم نحو الملك:** `{current_wins}/5` فوزات")
         return
+
 
 
     # 4. أوامر الإدارة
