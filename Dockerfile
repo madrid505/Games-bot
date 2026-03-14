@@ -12,8 +12,8 @@ WORKDIR /app
 # نسخ كل الملفات
 COPY . .
 
-# تثبيت المكتبات البرمجية
-RUN pip install --no-cache-dir telethon Pillow
+# تثبيت المكتبات البرمجية المطلوبة للبوت
+RUN pip install --no-cache-dir python-telegram-bot==20.5 Pillow
 
 # أمر التشغيل
 CMD ["python3", "main.py"]
