@@ -1,6 +1,7 @@
-# Dockerfile games-bot
+# ملف: Dockerfile
 FROM python:3.9-slim
 
+# تثبيت مكتبات النظام اللازمة لمعالجة الصور
 RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     zlib1g-dev \
@@ -8,10 +9,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# نسخ كل الملفات
 COPY . .
 
+# تثبيت المكتبات البرمجية
 RUN pip install --no-cache-dir telethon Pillow
 
-RUN mkdir -p /app/data && chmod 777 /app/data
-
-CMD ["python", "games_main.py"]  # غير اسم الملف الرئيسي إذا مختلف
+# أمر التشغيل
+CMD ["python3", "main.py"]
