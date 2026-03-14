@@ -1,15 +1,17 @@
-# استخدم صورة Python الرسمية
-FROM python:3.11-slim
+# Dockerfile games-bot
+FROM python:3.9-slim
 
-# اضبط متغير العمل داخل الحاوية
+RUN apt-get update && apt-get install -y \
+    libjpeg-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# انسخ ملفات المشروع إلى الحاوية
 COPY . .
 
-# تثبيت المتطلبات
-RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir telethon Pillow
 
-# أمر تشغيل البوت
-CMD ["python", "main.py"]
+RUN mkdir -p /app/data && chmod 777 /app/data
+
+CMD ["python", "games_main.py"]  # غير اسم الملف الرئيسي إذا مختلف
