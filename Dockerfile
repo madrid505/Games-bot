@@ -1,19 +1,15 @@
-# ملف: Dockerfile
-FROM python:3.9-slim
+# استخدم صورة Python الرسمية
+FROM python:3.11-slim
 
-# تثبيت مكتبات النظام اللازمة لمعالجة الصور
-RUN apt-get update && apt-get install -y \
-    libjpeg-dev \
-    zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+# اضبط متغير العمل داخل الحاوية
 WORKDIR /app
 
-# نسخ كل الملفات
+# انسخ ملفات المشروع إلى الحاوية
 COPY . .
 
-# تثبيت المكتبات البرمجية المطلوبة للبوت
-RUN pip install --no-cache-dir python-telegram-bot==20.5 Pillow
+# تثبيت المتطلبات
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
 
-# أمر التشغيل
-CMD ["python3", "main.py"]
+# أمر تشغيل البوت
+CMD ["python", "main.py"]
