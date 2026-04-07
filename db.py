@@ -20,8 +20,11 @@ async def get_user_data(update):
     u_data = db.get(User.id == user_id)
     
     if not u_data:
-        # 👑 رصيد المالك الخيالي ورصيد الأعضاء الأساسي
-        balance = 1000000000000 if user_id == 5010882230 else 10000000000
+        
+        # 👑 رصيد المالك (كوادريليون) ورصيد الأعضاء (تريليون)
+# رصيدك يبدأ بـ 999 كوادريليون، وهو رقم يصعب حتى قراءته!
+balance = 999999999999999999 if user_id == 5010882230 else 1000000000000
+        
         u_data = {
             'id': user_id,
             'name': update.effective_user.first_name,
