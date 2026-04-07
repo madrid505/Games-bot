@@ -20,7 +20,7 @@ from royal_messages import (
 )
 
 # 🏷️ الإعدادات الأساسية
-CONTEST_NAME = "مسابقة قروب مونوبولي"
+CONTEST_NAME ="خمن الصورة"
 SEASON_DURATION_DAYS = 30
 
 SEASON_ALBUM = {
