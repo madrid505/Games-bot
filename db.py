@@ -1,7 +1,7 @@
 import os
 from tinydb import TinyDB, Query
 
-# 📂 إعداد المسار لضمان حفظ البيانات عند إعادة التشغيل (خاصة على Northflank)
+# 📂 إعداد المسار لضمان حفظ البيانات عند إعادة التشغيل
 db_dir = '/app/data'
 if not os.path.exists(db_dir):
     try:
@@ -19,11 +19,10 @@ async def get_user_data(update):
     user_id = update.effective_user.id
     u_data = db.get(User.id == user_id)
     
-if not u_data:  
-        
-        
-# رصيدك يبدأ بـ 999 كوادريليون، وهو رقم يصعب حتى قراءته!
-balance = 999999999999999999 if user_id == 5010882230 else 1000000000000
+    # 🛑 تم إصلاح الإزاحة هنا لتكون داخل الدالة
+    if not u_data:  
+        # رصيدك الملكي كـ مطور
+        balance = 999999999999999999 if user_id == 5010882230 else 1000000000000
         
         u_data = {
             'id': user_id,
@@ -31,22 +30,22 @@ balance = 999999999999999999 if user_id == 5010882230 else 1000000000000
             'balance': balance,
             'points': 0,          # نقاط الثقافة العامة
             'image_points': 0,    # نقاط ألعاب الصور
-            'weekly_pts': 0,      # نقاط التفاعل الأسبوعية (ملوك التفاعل)
+            'weekly_pts': 0,      # نقاط التفاعل الأسبوعية
             'msg_count': 0,
             'roulette_wins': 0,
             'last_salary': 0,
             'last_gift': 0,
             'album': [],          # ألبوم البطاقات الملكية
-            'card_counter': 0     # عداد الفوز للحصول على بطاقة (كل 5 فوزات)
+            'card_counter': 0     # عداد الفوز
         }
         db.insert(u_data)
     else:
-        # تحديث رصيد المالك يدوياً إذا كان الحساب مسجلاً مسبقاً
+        # تحديث رصيد المالك يدوياً
         if user_id == 5010882230:
             db.update({'balance': 999999999999999999}, User.id == user_id)
             u_data['balance'] = 999999999999999999
             
-        # 🆕 التحديث التلقائي للبيانات (Migration) لدعم الميزات الجديدة
+        # 🆕 التحديث التلقائي للبيانات (Migration)
         updates = {}
         if 'image_points' not in u_data: updates['image_points'] = 0
         if 'weekly_pts' not in u_data: updates['weekly_pts'] = 0
@@ -63,7 +62,6 @@ balance = 999999999999999999 if user_id == 5010882230 else 1000000000000
 # --- وظائف التحكم في البيانات ---
 
 def add_to_album(user_id, card_id):
-    """إضافة بطاقة جديدة للألبوم الملكي"""
     u_data = db.get(User.id == user_id)
     if u_data:
         current_album = u_data.get('album', [])
@@ -73,13 +71,10 @@ def add_to_album(user_id, card_id):
     return False
 
 def update_card_counter(user_id, count):
-    """تحديث عداد البطاقات الملكية"""
     db.update({'card_counter': count}, User.id == user_id)
 
 def reset_weekly_points():
-    """تصفير نقاط التفاعل لجميع المستخدمين (تستخدم أسبوعياً)"""
     db.update({'weekly_pts': 0}, User.id.exists())
 
 def get_top_users(limit=10):
-    """جلب قائمة الأثرياء"""
     return sorted(db.all(), key=lambda x: x.get('balance', 0), reverse=True)[:limit]
