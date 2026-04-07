@@ -99,7 +99,20 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id in [int(i) for i in GROUP_IDS] or u_id == OWNER_ID:
         if update.message.text or update.message.photo:
             await handle_messages(update, context)
-
+async def image_hunter_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """صياد الصور: يعمل فقط في الخاص ومع المالك فقط"""
+    # التأكد أن الرسالة تحتوي على صورة، وأنها في الخاص، وأن المرسل هو المالك
+    if update.message.photo and update.effective_chat.type == 'private' and update.effective_user.id == OWNER_ID:
+        # الحصول على المعرف لأعلى جودة صورة
+        file_id = update.message.photo[-1].file_id
+        
+        text = (
+            "🎯 **تم اصطياد المعرف الملكي للصورة!**\n\n"
+            f"`{file_id}`\n\n"
+            "✨ *استخدم هذا المعرف في ملفات الألعاب الخاصة بك.*"
+        )
+        await update.message.reply_text(text, parse_mode='Markdown')
+        
 def main():
     # --- إعداد مسار الحفظ لضمان عدم التداخل ---
     volume_path = "/app/data"
@@ -115,6 +128,9 @@ def main():
     app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), catch_ids))
     app.add_handler(CallbackQueryHandler(callback_handler))
     print("👑 إمبراطورية مونوبولي تعمل الآن بالنظام المطور (تذكير كل 10ث + مدى 60 رقم + حفظ دائم)..")
+    # إضافة صياد الصور (يجب أن يكون قبل معالج الرسائل العام لضمان الأولوية)
+    app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, image_hunter_private))
+    
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
