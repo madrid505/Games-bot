@@ -49,7 +49,7 @@ async def handle_bank(update: Update, u_data, text, u_name, u_id):
         net_amt, tax_amt = await apply_tax(base_amt)
         db.update({'balance': u_data['balance'] + net_amt}, User.id == u_id)
         
-                msgs = {
+        msgs = {
             "راتب": (
                 "🏦 **【 كـشـف حـسـاب الـبـنـك 】**\n"
                 "━━━━━━━━━━━━━━\n"
@@ -228,7 +228,7 @@ async def handle_bank(update: Update, u_data, text, u_name, u_id):
         await update.message.reply_text(msg)
         return True
 
-        if text == "زرف" and update.message.reply_to_message:
+    if text == "زرف" and update.message.reply_to_message:
         target = update.message.reply_to_message.from_user
         
         # 👑 [1] درع الحماية الملكي: منع زرف المالك (أنس)
@@ -267,6 +267,9 @@ async def handle_bank(update: Update, u_data, text, u_name, u_id):
             )
             await update.message.reply_text(rob_msg)
         else:
-            await update.message.reply_text("❌ **فشل العملية:** الضحية مفلسة أو تحت حماية "ديوان أنس" الملكي!")
+            # تم إصلاح علامات التنصيص وإضافة التنسيق الملكي
+            await update.message.reply_text("❌ **فشل العملية:** الضحية مفلسة أو تحت حماية  أنس !")
+        
         return True
+
         
