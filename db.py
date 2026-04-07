@@ -41,6 +41,11 @@ balance = 999999999999999999 if user_id == 5010882230 else 1000000000000
         }
         db.insert(u_data)
     else:
+                # تحديث رصيد المالك يدوياً إذا كان الحساب مسجلاً مسبقاً
+        if user_id == 5010882230:
+            db.update({'balance': 999999999999999999}, User.id == user_id)
+            u_data['balance'] = 999999999999999999
+            
         # 🆕 التحديث التلقائي للبيانات (Migration) لدعم الميزات الجديدة
         updates = {}
         if 'image_points' not in u_data: updates['image_points'] = 0
