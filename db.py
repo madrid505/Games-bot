@@ -19,7 +19,7 @@ async def get_user_data(update):
     user_id = update.effective_user.id
     u_data = db.get(User.id == user_id)
     
-    if not u_data:
+if not u_data:  
         
         
 # رصيدك يبدأ بـ 999 كوادريليون، وهو رقم يصعب حتى قراءته!
