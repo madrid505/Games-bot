@@ -22,6 +22,8 @@ from royal_messages import (
 # 🏷️ الإعدادات الأساسية
 CONTEST_NAME ="خمن الصورة"
 SEASON_DURATION_DAYS = 30
+# متغير لحفظ ترتيب الصورة الحالية (يبدأ من الصفر)
+current_image_index = 0
 
 SEASON_ALBUM = {
     "card1": "🇧🇷 رونالدو", "card2": "🇷🇸 مودريتش", "card3": "🇵🇹 كريستيانو",
@@ -221,15 +223,28 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current_type = context.chat_data.get('current_game_type', "general")
             await process_win(update, context, u_data, u_id, u_name, current_type)
             return
-
         # ج - تشغيل "صور" نصياً
         if text == "صور":
+            global current_image_index
             IMAGES = load_image_quiz()
             if IMAGES:
-                q = random.choice(IMAGES)
+                # إذا وصلنا لنهاية الصور، ابدأ من 0 مرة أخرى
+                if current_image_index >= len(IMAGES): 
+                    current_image_index = 0
+                
+                q = IMAGES[current_image_index]
                 context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
-                await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**")
+                
+                await context.bot.send_photo(
+                    update.effective_chat.id, 
+                    q['file_id'], 
+                    caption=f"🎮 **{CONTEST_NAME}**\n🔢 صورة رقم: {current_image_index + 1}"
+                )
+                
+                current_image_index += 1  
                 return
+                
+
 
         # د - خارطة الألعاب النصية (تأكد من وجودها هنا بشكل مستقل)
         game_map = {
@@ -382,10 +397,24 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "admin_add_guess": await initiate_guess(query, context, query.from_user.first_name)
     
     elif data == "run_image_game":
-        if IMAGE_QUIZ:
-            q = random.choice(IMAGE_QUIZ)
+        global current_image_index
+        IMAGES = load_image_quiz()
+        if IMAGES:
+            # العودة للبداية إذا انتهت الصور
+            if current_image_index >= len(IMAGES): 
+                current_image_index = 0
+            
+            q = IMAGES[current_image_index]
             context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
-            await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**")
+            
+            await context.bot.send_photo(
+                update.effective_chat.id, 
+                q['file_id'], 
+                caption=f"🎮 **{CONTEST_NAME}**\n🔢 صورة رقم: {current_image_index + 1}"
+            )
+            
+            current_image_index += 1  # تحديث العداد
+        
             
     elif data == "run_contest_game":
         if CONTEST_QUIZ:
