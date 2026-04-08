@@ -226,14 +226,25 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**"); return
 
         game_map = {
-            "اسلاميات": "islamic", "إسلاميات": "islamic", 
-            "ثقافة عامة": "general", "سيارات": "cars", 
-            "أندية": "clubs", "عواصم": "countries", 
-            "أعلام": "flags", "عكس": "reverse", 
-            "ترتيب": "order", "تفكيك": "decompose", 
-            "رياضيات": "math", "إنجليزي": "english", 
-            "كلمات": "words", "مختلف": "misc"
+    "اسلاميات": "islamic", 
+    "إسلاميات": "islamic", 
+    "ثقافة عامة": "general",   
+    "سيارات": "cars", 
+    "أندية": "clubs", 
+    "عواصم": "countries", 
+    "أعلام": "flags", 
+    "عكس": "reverse", 
+    "ترتيب": "order", 
+    "تفكيك": "decompose", 
+    "رياضيات": "math", 
+    "إنجليزي": "english", 
+    "كلمات": "words", 
+    "مختلف": "misc",       # أضفنا الفاصلة هنا
+    "جمع": "words",        
+    "مفرد": "words",       
+    "مفرد وجمع": "words" 
         }
+        
         if text in game_map:
             # تحديث الأسئلة لحظياً من الملفات
             ALL_QS = load_questions() 
