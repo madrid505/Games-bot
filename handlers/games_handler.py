@@ -91,7 +91,7 @@ def get_main_menu_keyboard(is_admin=False):
         ],
         [
             InlineKeyboardButton("💡 ثقافة عامة", callback_data="run_general"), 
-            InlineKeyboardButton("🕋 إسلاميات", callback_data="run_islamic")
+            InlineKeyboardButton("🕋 اسلاميات", callback_data="run_islamic")
         ],
         [
             InlineKeyboardButton("⚽ أندية", callback_data="run_clubs"), 
@@ -216,12 +216,23 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if str(context.chat_data.get('game_ans')) == text:
             await process_win(update, context, u_data, u_id, u_name, "general"); return
 
-        if text == "صور" and IMAGE_QUIZ:
-            q = random.choice(IMAGE_QUIZ)
-            context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
-            await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**"); return
+        # تشغيل "صور" نصياً (تحديث لحظي)
+        if text == "صور":
+            IMAGES = load_image_quiz_dynamic()
+            if IMAGES:
+                q = random.choice(IMAGES)
+                context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
+                await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**"); return
 
-        game_map = {"إسلاميات": "islamic", "ثقافة عامة": "general", "سيارات": "cars", "أندية": "clubs", "عواصم": "countries", "أعلام": "flags", "عكس": "reverse", "ترتيب": "order", "تفكيك": "decompose", "رياضيات": "math", "إنجليزي": "english", "كلمات": "words", "مختلف": "misc"}
+        game_map = {
+            "اسلاميات": "islamic", "إسلاميات": "islamic", 
+            "ثقافة عامة": "general", "سيارات": "cars", 
+            "أندية": "clubs", "عواصم": "countries", 
+            "أعلام": "flags", "عكس": "reverse", 
+            "ترتيب": "order", "تفكيك": "decompose", 
+            "رياضيات": "math", "إنجليزي": "english", 
+            "كلمات": "words", "مختلف": "misc"
+        }
         if text in game_map:
             # تحديث الأسئلة لحظياً من الملفات
             ALL_QS = load_questions() 
