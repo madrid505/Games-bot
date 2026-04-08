@@ -86,8 +86,9 @@ def get_main_menu_keyboard(is_admin=False):
     # قائمة الأزرار مرتبة بشكل ملكي وأنيق
     keyboard = [
         [
-            InlineKeyboardButton("🏆 مسابقة الصور", callback_data="run_pics"), 
-            InlineKeyboardButton("🖼️ لعبة الصور", callback_data="run_pics")
+            InlineKeyboardButton("🏆 مسابقة الصور", callback_data="run_contest_game"), 
+            InlineKeyboardButton("🖼️ لعبة الصور", callback_data="run_image_game")
+            
         ],
         [
             InlineKeyboardButton("💡 ثقافة عامة", callback_data="run_general"), 
@@ -218,7 +219,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # تشغيل "صور" نصياً (تحديث لحظي)
         if text == "صور":
-            IMAGES = load_image_quiz_dynamic()
+            IMAGES = load_image_quiz()
             if IMAGES:
                 q = random.choice(IMAGES)
                 context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
