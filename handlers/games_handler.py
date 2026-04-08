@@ -211,26 +211,27 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 6. تشغيل الألعاب
     if not context.chat_data.get('games_locked') or is_admin:
+        # أ - التحقق من إجابة الصور
         if context.chat_data.get('img_ans') == text:
-            await process_win(update, context, u_data, u_id, u_name, "images"); return
+            await process_win(update, context, u_data, u_id, u_name, "images")
+            return
         
-    # التحقق من إجابة الأسئلة
-    if str(context.chat_data.get('game_ans')) == text:
-    # جلب نوع اللعبة التي بدأت من الذاكرة (بدل كلمة general الثابتة)
-    current_type = context.chat_data.get('current_game_type', "general")
-    await process_win(update, context, u_data, u_id, u_name, current_type)
-    return
-    
+        # ب - التحقق من إجابة الأسئلة (مفرد وجمع، إسلاميات، إلخ)
+        if str(context.chat_data.get('game_ans')) == text:
+            current_type = context.chat_data.get('current_game_type', "general")
+            await process_win(update, context, u_data, u_id, u_name, current_type)
+            return
 
-    # تشغيل "صور" نصياً (تحديث لحظي)
-    if text == "صور":
+        # ج - تشغيل "صور" نصياً
+        if text == "صور":
             IMAGES = load_image_quiz()
             if IMAGES:
                 q = random.choice(IMAGES)
                 context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
-                await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**"); return
+                await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**")
+                return
 
-        # تحديث خارطة الألعاب الملكية - الفصل بين الكلمات والمفرد والجمع
+        # د - خارطة الألعاب النصية (تأكد من وجودها هنا بشكل مستقل)
         game_map = {
             "اسلاميات": "islamic", "إسلاميات": "islamic", 
             "ثقافة عامة": "general", "سيارات": "cars", 
@@ -239,26 +240,22 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "ترتيب": "order", "تفكيك": "decompose", 
             "رياضيات": "math", "إنجليزي": "english", 
             "كلمات": "words", "مختلف": "misc",
-            # الربط الجديد للعبة المفرد والجمع بملف مستقل
-            "جمع": "plural", 
-            "مفرد": "plural", 
-            "مفرد وجمع": "plural" 
-}
+            "جمع": "plural", "مفرد": "plural", "مفرد وجمع": "plural" 
+        }
 
-        
         if text in game_map:
             ALL_QS = load_questions() 
             category = game_map[text]
             if category in ALL_QS and ALL_QS[category]:
                 q = random.choice(ALL_QS[category])
-                # حفظ الإجابة ونوع اللعبة (category) لضمان توزيع النقاط صح
                 context.chat_data.update({
                     'game_ans': q['answer'], 
                     'game_start_time': time.time(),
-                    'current_game_type': category  # هذا السطر ضروري جداً
+                    'current_game_type': category
                 })
                 await update.message.reply_text(f"🎮 **بدأت تحدي {text}**:\n【 {q['question']} 】")
-            return
+                return
+    
                 
             
 
