@@ -214,8 +214,13 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if context.chat_data.get('img_ans') == text:
             await process_win(update, context, u_data, u_id, u_name, "images"); return
         
-        if str(context.chat_data.get('game_ans')) == text:
-            await process_win(update, context, u_data, u_id, u_name, "general"); return
+    # التحقق من إجابة الأسئلة
+    if str(context.chat_data.get('game_ans')) == text:
+    # جلب نوع اللعبة التي بدأت من الذاكرة (بدل كلمة general الثابتة)
+    current_type = context.chat_data.get('current_game_type', "general")
+    await process_win(update, context, u_data, u_id, u_name, current_type)
+    return
+    
 
         # تشغيل "صور" نصياً (تحديث لحظي)
         if text == "صور":
@@ -225,35 +230,32 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
                 await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**"); return
 
-        game_map = {
-    "اسلاميات": "islamic", 
-    "إسلاميات": "islamic", 
-    "ثقافة عامة": "general",   
-    "سيارات": "cars", 
-    "أندية": "clubs", 
-    "عواصم": "countries", 
-    "أعلام": "flags", 
-    "عكس": "reverse", 
-    "ترتيب": "order", 
-    "تفكيك": "decompose", 
-    "رياضيات": "math", 
-    "إنجليزي": "english", 
-    "كلمات": "words", 
-    "مختلف": "misc",       # أضفنا الفاصلة هنا
-    "جمع": "words",        
-    "مفرد": "words",       
-    "مفرد وجمع": "words" 
+            # تحديث خارطة الألعاب الملكية الخاصة بك
+            game_map = {
+            "اسلاميات": "islamic", "إسلاميات": "islamic", 
+            "ثقافة عامة": "general", "سيارات": "cars", 
+            "أندية": "clubs", "عواصم": "countries", 
+            "أعلام": "flags", "عكس": "reverse", 
+            "ترتيب": "order", "تفكيك": "decompose", 
+            "رياضيات": "math", "إنجليزي": "english", 
+            "كلمات": "words", "مختلف": "misc",
+            "جمع": "words", "مفرد": "words", "مفرد وجمع": "words" 
         }
         
         if text in game_map:
-            # تحديث الأسئلة لحظياً من الملفات
             ALL_QS = load_questions() 
             category = game_map[text]
             if category in ALL_QS and ALL_QS[category]:
                 q = random.choice(ALL_QS[category])
-                context.chat_data.update({'game_ans': q['answer'], 'game_start_time': time.time()})
-                await update.message.reply_text(f"🎮 **بدأت {text}**:\n【 {q['question']} 】")
+                # حفظ الإجابة ونوع اللعبة (category) لضمان توزيع النقاط صح
+                context.chat_data.update({
+                    'game_ans': q['answer'], 
+                    'game_start_time': time.time(),
+                    'current_game_type': category  # هذا السطر ضروري جداً
+                })
+                await update.message.reply_text(f"🎮 **بدأت تحدي {text}**:\n【 {q['question']} 】")
             return
+                
             
 
     if text in ["قائمة", "الاوامر", "الأوامر"]:
