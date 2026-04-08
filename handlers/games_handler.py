@@ -222,16 +222,16 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
     
 
-        # تشغيل "صور" نصياً (تحديث لحظي)
-        if text == "صور":
+    # تشغيل "صور" نصياً (تحديث لحظي)
+    if text == "صور":
             IMAGES = load_image_quiz()
             if IMAGES:
                 q = random.choice(IMAGES)
                 context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
                 await context.bot.send_photo(update.effective_chat.id, q['file_id'], caption=f"🎮 **{CONTEST_NAME}**"); return
 
-            # تحديث خارطة الألعاب الملكية الخاصة بك
-            game_map = {
+        # تحديث خارطة الألعاب الملكية - الفصل بين الكلمات والمفرد والجمع
+        game_map = {
             "اسلاميات": "islamic", "إسلاميات": "islamic", 
             "ثقافة عامة": "general", "سيارات": "cars", 
             "أندية": "clubs", "عواصم": "countries", 
@@ -239,8 +239,12 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "ترتيب": "order", "تفكيك": "decompose", 
             "رياضيات": "math", "إنجليزي": "english", 
             "كلمات": "words", "مختلف": "misc",
-            "جمع": "words", "مفرد": "words", "مفرد وجمع": "words" 
-        }
+            # الربط الجديد للعبة المفرد والجمع بملف مستقل
+            "جمع": "plural", 
+            "مفرد": "plural", 
+            "مفرد وجمع": "plural" 
+}
+
         
         if text in game_map:
             ALL_QS = load_questions() 
@@ -398,6 +402,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ALL_QS = load_questions()
         if game in ALL_QS and ALL_QS[game]:
             q = random.choice(ALL_QS[game])
-            context.chat_data.update({'game_ans': q['answer'], 'game_start_time': time.time()})
-            await query.message.reply_text(f"🎮 **بدأت {game}**:\n【 {q['question']} 】")
+            # تحديث الذاكرة لضمان حفظ الإجابة ونوع اللعبة لتوزيع النقاط
+            context.chat_data.update({
+                'game_ans': q['answer'], 
+                'game_start_time': time.time(),
+                'current_game_type': game
+            })
+            
+            await query.message.reply_text(f"🎮 **بدأت تحدي {game}**:\n【 {q['question']} 】")
         
