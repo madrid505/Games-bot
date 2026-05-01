@@ -182,6 +182,8 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # التحقق من لقب "الإمبراطور" عند الفوز الخامس
         if current_wins >= 5:
+            db.update({'guess_wins': 0}, User.id.exists())
+            
             db.update({'guess_wins': 0, 'balance': u_data['balance'] + 500000}, User.id == u_id)
             magic_winner = (
                 f"👑 **تتويج ملك التخمين الجديد** 👑\n"
