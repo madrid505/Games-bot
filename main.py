@@ -9,6 +9,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 # استيراد الرسائل الملكية
 from royal_messages import GUESS_START_ANNOUNCEMENT
+from hunter import hunter_handler
 
 # إعداد السجلات
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
