@@ -406,23 +406,20 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "admin_add_guess": await initiate_guess(query, context, query.from_user.first_name)
     
     elif data == "run_image_game":
-        global current_image_index
+        
         IMAGES = load_image_quiz()
         if IMAGES:
-            # العودة للبداية إذا انتهت الصور
-            if current_image_index >= len(IMAGES): 
-                current_image_index = 0
-            
-            q = IMAGES[current_image_index]
+            # إختيار عشوائي تماماً
+            q = random.choice(IMAGES)
             context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
             
+            img_num = IMAGES.index(q) + 1
             await context.bot.send_photo(
                 update.effective_chat.id, 
                 q['file_id'], 
-                caption=f"🎮 **{CONTEST_NAME}**\n🔢 صورة رقم: {current_image_index + 1}"
+                caption=f"🎮 **{CONTEST_NAME}**\n🎲 تحدي عشوائي | صورة رقم: {img_num}"
             )
-            
-            current_image_index += 1  # تحديث العداد
+
         
             
     elif data == "run_contest_game":
