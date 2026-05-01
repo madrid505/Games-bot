@@ -113,6 +113,8 @@ def main():
 
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(hunter_handler)
+
     app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), catch_ids))
     app.add_handler(CallbackQueryHandler(callback_handler))
     print("👑 إمبراطورية مونوبولي تعمل الآن بالنظام المطور (تذكير كل 10ث + مدى 60 رقم + حفظ دائم)..")
