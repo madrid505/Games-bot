@@ -145,7 +145,16 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 👑 [تعديل هام] تعريف الصلاحيات في البداية لتجنب خطأ UnboundLocalError
     admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
     is_admin = u_id == OWNER_ID or u_id in admins
-
+    # 📸 [إضافة] نظام اصطياد آيدي الصور (للمالك فقط)
+    if update.message.photo and u_id == OWNER_ID:
+        photo_id = update.message.photo[-1].file_id
+        await update.message.reply_html(
+            f"<b>✅ تم اصطياد ID الصورة بنجاح!</b>\n\n"
+            f"<code>{photo_id}=الجواب_هنا</code>\n\n"
+            f"انسخ السطر وأضفه لملف images.txt"
+        )
+        return
+        
     # --- 👑 تسجيل نقاط التفاعل التلقائي (للأعضاء فقط) ---
     if not is_admin:
         new_weekly_pts = u_data.get('weekly_pts', 0) + 1
