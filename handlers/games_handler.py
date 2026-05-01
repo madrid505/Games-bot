@@ -20,10 +20,8 @@ from royal_messages import (
 )
 
 # 🏷️ الإعدادات الأساسية
-CONTEST_NAME ="خمن الصورة"
+CONTEST_NAME ="👑خمن الصورة👑"
 SEASON_DURATION_DAYS = 30
-# متغير لحفظ ترتيب الصورة الحالية (يبدأ من الصفر)
-current_image_index = 0
 
 SEASON_ALBUM = {
     "card1": "🇧🇷 رونالدو", "card2": "🇷🇸 مودريتش", "card3": "🇵🇹 كريستيانو",
@@ -232,26 +230,28 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current_type = context.chat_data.get('current_game_type', "general")
             await process_win(update, context, u_data, u_id, u_name, current_type)
             return
-        # ج - تشغيل "صور" نصياً
+        # ج - تشغيل "صور" نصياً بطريقة عشوائية ذكية
         if text == "صور":
-            global current_image_index
             IMAGES = load_image_quiz()
             if IMAGES:
-                # إذا وصلنا لنهاية الصور، ابدأ من 0 مرة أخرى
-                if current_image_index >= len(IMAGES): 
-                    current_image_index = 0
+                # اختيار صورة عشوائية تماماً من القائمة
+                q = random.choice(IMAGES)
                 
-                q = IMAGES[current_image_index]
-                context.chat_data.update({'img_ans': q['answer'], 'img_start_time': time.time()})
+                context.chat_data.update({
+                    'img_ans': q['answer'], 
+                    'img_start_time': time.time()
+                })
+                
+                # جلب رقم الصورة العشوائية في الملف (اختياري للعرض فقط)
+                img_num = IMAGES.index(q) + 1
                 
                 await context.bot.send_photo(
                     update.effective_chat.id, 
                     q['file_id'], 
-                    caption=f"🎮 **{CONTEST_NAME}**\n🔢 صورة رقم: {current_image_index + 1}"
+                    caption=f"🎮 **{CONTEST_NAME}**\n🎲 تحدي عشوائي | صورة رقم: {img_num}"
                 )
-                
-                current_image_index += 1  
                 return
+
                 
 
 
