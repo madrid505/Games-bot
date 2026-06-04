@@ -97,7 +97,11 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
     # --- ثانياً: تشغيل الأوامر الطبيعية في القروبات المسموحة ---
-    if update.effective_chat.id in [int(i) for i in GROUP_IDS] or u_id == OWNER_ID:
+    # نحول كلاً من المعرف الحالي والقائمة إلى نصوص للمقارنة الدقيقة
+    current_chat_id = str(update.effective_chat.id)
+    allowed_groups = [str(i).strip() for i in GROUP_IDS]
+
+    if current_chat_id in allowed_groups or u_id == OWNER_ID:
         if update.message.text or update.message.photo:
             await handle_messages(update, context)
 
