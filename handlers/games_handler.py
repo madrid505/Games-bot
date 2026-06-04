@@ -129,48 +129,43 @@ def get_main_menu_keyboard(is_admin=False):
 
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. التأكد من وجود البيانات الأساسية للرسالة
     if not update.effective_chat or not update.message or not update.message.text:
         return
 
-    # 2. التحقق من القروب
     current_chat_id = str(update.effective_chat.id).strip()
+    u_id = update.effective_user.id
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
     
-    # طباعة تشخيصية (ستظهر في الـ Logs لتتأكد من الآيدي)
-    print(f"DEBUG: فحص الوصول | القروب الحالي: {current_chat_id} | المسموح: {allowed_groups}")
+    # 👑 تعريف الصلاحيات (نحتاجها هنا قبل شرط القروب)
+    # الحصول على المشرفين قد يحتاج إلى try/except لتجنب أخطاء إذا لم يكن البوت مشرفاً
+    try:
+        admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
+    except:
+        admins = []
     
-    # إذا لم يكن القروب في القائمة، نخرج فوراً (بدون استثناء للمشرفين)
-    if current_chat_id not in allowed_groups:
+    is_admin = u_id == OWNER_ID or u_id in admins
+
+    # 🛑 البوابة: إذا لم تكن مشرفاً، يجب أن يكون القروب في القائمة
+    if not is_admin and current_chat_id not in allowed_groups:
         return
 
-    # 3. بقية العمليات (سيعمل هذا الكود للجميع الآن)
+    # --- بقية الكود الخاص بك ---
     if check_and_reset_timers():
         await broadcast_weekly_kings(update, context)
 
-    text = update.message.text.strip()
-    u_id = update.effective_user.id
-    u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
-    
-    # 👑 تعريف الصلاحيات (نحتاجها فقط لتسجيل النقاط أو تمييز المشرف)
-    admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
-    is_admin = u_id == OWNER_ID or u_id in admins
     
     # 📸 نظام اصطياد آيدي الصور (للمالك فقط)
     if update.message.photo and u_id == OWNER_ID:
         photo_id = update.message.photo[-1].file_id
-        await update.message.reply_html(
-            f"<b>✅ تم اصطياد ID الصورة بنجاح!</b>\n\n"
-            f"<code>{photo_id}=الجواب_هنا</code>\n\n"
-            f"انسخ السطر وأضفه لملف images.txt"
-        )
+        await update.message.reply_html(f"✅ تم اصطياد ID الصورة:\n<code>{photo_id}=الجواب_هنا</code>")
         return
         
     # --- تسجيل نقاط التفاعل ---
     if not is_admin:
         new_weekly_pts = u_data.get('weekly_pts', 0) + 1
         db.update({'weekly_pts': new_weekly_pts}, User.id == u_id)
+
 
         
     # ... أكمل باقي الكود الخاص بك من ملفك الأصلي ...
