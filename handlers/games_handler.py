@@ -129,6 +129,12 @@ def get_main_menu_keyboard(is_admin=False):
 
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"DEBUG: وصول رسالة - القروب: {update.effective_chat.id} | المستخدم: {update.effective_user.first_name} | النص: {update.message.text if update.message and update.message.text else 'لا يوجد'}")
+    
+    # التعديل هنا: تحويل المعرفات إلى نصوص للمقارنة الدقيقة
+    current_chat_id = str(update.effective_chat.id)
+    # ... بقية الكود
+
     # التعديل هنا: تحويل المعرفات إلى نصوص للمقارنة الدقيقة
     current_chat_id = str(update.effective_chat.id)
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
