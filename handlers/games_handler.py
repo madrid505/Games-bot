@@ -129,20 +129,19 @@ def get_main_menu_keyboard(is_admin=False):
 
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"DEBUG: وصول رسالة - القروب: {update.effective_chat.id} | المستخدم: {update.effective_user.first_name} | النص: {update.message.text if update.message and update.message.text else 'لا يوجد'}")
-    
-    # التعديل هنا: تحويل المعرفات إلى نصوص للمقارنة الدقيقة
-    current_chat_id = str(update.effective_chat.id)
-    # ... بقية الكود
+    # 🕵️ كود التشخيص (للتحقق من الـ ID في الـ Logs)
+    if update.effective_chat:
+        print(f"DEBUG: وصول رسالة - القروب: {update.effective_chat.id} | المستخدم: {update.effective_user.first_name} | النص: {update.message.text if update.message and update.message.text else 'لا يوجد'}")
 
-    # التعديل هنا: تحويل المعرفات إلى نصوص للمقارنة الدقيقة
+    # 1. التحقق من القروب
     current_chat_id = str(update.effective_chat.id)
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
     
+    # التحقق الأساسي (إذا لم يكن القروب في القائمة، نخرج)
     if not update.effective_chat or current_chat_id not in allowed_groups or not update.message or not update.message.text:
         return
 
-
+    # 2. بقية كودك الأصلي يبدأ من هنا
     if check_and_reset_timers():
         await broadcast_weekly_kings(update, context)
 
@@ -151,10 +150,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
     
-    # 👑 [تعديل هام] تعريف الصلاحيات في البداية لتجنب خطأ UnboundLocalError
+    # 👑 تعريف الصلاحيات
     admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
     is_admin = u_id == OWNER_ID or u_id in admins
-    # 📸 [إضافة] نظام اصطياد آيدي الصور (للمالك فقط)
+    
+    # 📸 نظام اصطياد آيدي الصور
     if update.message.photo and u_id == OWNER_ID:
         photo_id = update.message.photo[-1].file_id
         await update.message.reply_html(
@@ -164,11 +164,13 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
         
-    # --- 👑 تسجيل نقاط التفاعل التلقائي (للأعضاء فقط) ---
+    # --- تسجيل نقاط التفاعل ---
     if not is_admin:
         new_weekly_pts = u_data.get('weekly_pts', 0) + 1
         db.update({'weekly_pts': new_weekly_pts}, User.id == u_id)
-    # -----------------------------------------------
+        
+    # ... أكمل باقي الكود الخاص بك من ملفك الأصلي ...
+
 
     # 2. أوامر البنك الملكي
     if await handle_bank(update, u_data, text, u_name, u_id): return
