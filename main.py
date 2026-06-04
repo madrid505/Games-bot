@@ -37,6 +37,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         await update.message.reply_text("👑 أهلاً بك في بوت إمبراطورية مونوبولي.")
 
+async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر لمعرفة آيدي المجموعة أو الشخص"""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    await update.message.reply_text(f"🆔 **معلومات المعرف:**\n\n📌 آيدي المجموعة: `{chat_id}`\n👤 آيدي المستخدم: `{user_id}`")
+
 async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """المعالج الرئيسي للرسائل"""
     if not update.message: return
@@ -117,6 +123,7 @@ def main():
 
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("getid", get_id))
     app.add_handler(hunter_handler)
 
     app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), catch_ids))
