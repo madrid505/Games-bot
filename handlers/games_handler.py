@@ -129,15 +129,18 @@ def get_main_menu_keyboard(is_admin=False):
 
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # التأكد من وجود نص
     if not update.effective_chat or not update.message or not update.message.text:
         return
 
+    # 1. تعريف المتغيرات الأساسية فوراً
+    text = update.message.text.strip()
+    u_name = update.effective_user.first_name
     current_chat_id = str(update.effective_chat.id).strip()
     u_id = update.effective_user.id
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
     
-    # 👑 تعريف الصلاحيات (نحتاجها هنا قبل شرط القروب)
-    # الحصول على المشرفين قد يحتاج إلى try/except لتجنب أخطاء إذا لم يكن البوت مشرفاً
+    # 2. تعريف الصلاحيات
     try:
         admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
     except:
@@ -145,17 +148,17 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     is_admin = u_id == OWNER_ID or u_id in admins
 
-    # 🛑 البوابة: إذا لم تكن مشرفاً، يجب أن يكون القروب في القائمة
+    # 3. البوابة الأمنية
     if not is_admin and current_chat_id not in allowed_groups:
         return
 
-    # --- بقية الكود الخاص بك ---
+    # 4. بقية العمليات
     if check_and_reset_timers():
         await broadcast_weekly_kings(update, context)
 
     u_data = await get_user_data(update)
     
-    # 📸 نظام اصطياد آيدي الصور (للمالك فقط)
+    # 📸 نظام اصطياد آيدي الصور
     if update.message.photo and u_id == OWNER_ID:
         photo_id = update.message.photo[-1].file_id
         await update.message.reply_html(f"✅ تم اصطياد ID الصورة:\n<code>{photo_id}=الجواب_هنا</code>")
@@ -166,9 +169,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_weekly_pts = u_data.get('weekly_pts', 0) + 1
         db.update({'weekly_pts': new_weekly_pts}, User.id == u_id)
 
-
-        
-    # ... أكمل باقي الكود الخاص بك من ملفك الأصلي ...
+    
 
 
     # 2. أوامر البنك الملكي
