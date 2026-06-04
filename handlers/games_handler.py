@@ -129,8 +129,13 @@ def get_main_menu_keyboard(is_admin=False):
 
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.effective_chat or update.effective_chat.id not in GROUP_IDS or not update.message or not update.message.text:
+    # التعديل هنا: تحويل المعرفات إلى نصوص للمقارنة الدقيقة
+    current_chat_id = str(update.effective_chat.id)
+    allowed_groups = [str(i).strip() for i in GROUP_IDS]
+    
+    if not update.effective_chat or current_chat_id not in allowed_groups or not update.message or not update.message.text:
         return
+
 
     if check_and_reset_timers():
         await broadcast_weekly_kings(update, context)
