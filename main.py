@@ -126,9 +126,10 @@ def main():
     app.add_handler(CommandHandler("getid", get_id))
     app.add_handler(hunter_handler)
 
-    app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), catch_ids))
+    # تم تغيير filters.ALL إلى filters.TEXT لضمان استقرار قراءة رسائل الأعضاء
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), catch_ids))
     app.add_handler(CallbackQueryHandler(callback_handler))
-    print("👑 إمبراطورية مونوبولي تعمل الآن بالنظام المطور (تذكير كل 10ث + مدى 60 رقم + حفظ دائم)..")
+    print("👑 إمبراطورية مونوبولي تعمل الآن بالنظام المطور (تذكير كل 10ث + مدى 60 رقم + حفظ دائم + فلتر نصي)..")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
