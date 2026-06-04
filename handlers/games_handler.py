@@ -129,19 +129,22 @@ def get_main_menu_keyboard(is_admin=False):
 
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 🕵️ كود التشخيص (للتحقق من الـ ID في الـ Logs)
-    if update.effective_chat:
-        print(f"DEBUG: وصول رسالة - القروب: {update.effective_chat.id} | المستخدم: {update.effective_user.first_name} | النص: {update.message.text if update.message and update.message.text else 'لا يوجد'}")
-
-    # 1. التحقق من القروب
-    current_chat_id = str(update.effective_chat.id)
-    allowed_groups = [str(i).strip() for i in GROUP_IDS]
-    
-    # التحقق الأساسي (إذا لم يكن القروب في القائمة، نخرج)
-    if not update.effective_chat or current_chat_id not in allowed_groups or not update.message or not update.message.text:
+    # 1. التأكد من وجود البيانات الأساسية للرسالة
+    if not update.effective_chat or not update.message or not update.message.text:
         return
 
-    # 2. بقية كودك الأصلي يبدأ من هنا
+    # 2. التحقق من القروب
+    current_chat_id = str(update.effective_chat.id).strip()
+    allowed_groups = [str(i).strip() for i in GROUP_IDS]
+    
+    # طباعة تشخيصية (ستظهر في الـ Logs لتتأكد من الآيدي)
+    print(f"DEBUG: فحص الوصول | القروب الحالي: {current_chat_id} | المسموح: {allowed_groups}")
+    
+    # إذا لم يكن القروب في القائمة، نخرج فوراً (بدون استثناء للمشرفين)
+    if current_chat_id not in allowed_groups:
+        return
+
+    # 3. بقية العمليات (سيعمل هذا الكود للجميع الآن)
     if check_and_reset_timers():
         await broadcast_weekly_kings(update, context)
 
@@ -150,11 +153,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_name = update.effective_user.first_name
     u_data = await get_user_data(update)
     
-    # 👑 تعريف الصلاحيات
+    # 👑 تعريف الصلاحيات (نحتاجها فقط لتسجيل النقاط أو تمييز المشرف)
     admins = [a.user.id for a in await context.bot.get_chat_administrators(update.effective_chat.id)]
     is_admin = u_id == OWNER_ID or u_id in admins
     
-    # 📸 نظام اصطياد آيدي الصور
+    # 📸 نظام اصطياد آيدي الصور (للمالك فقط)
     if update.message.photo and u_id == OWNER_ID:
         photo_id = update.message.photo[-1].file_id
         await update.message.reply_html(
@@ -168,6 +171,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin:
         new_weekly_pts = u_data.get('weekly_pts', 0) + 1
         db.update({'weekly_pts': new_weekly_pts}, User.id == u_id)
+
         
     # ... أكمل باقي الكود الخاص بك من ملفك الأصلي ...
 
