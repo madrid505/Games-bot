@@ -133,11 +133,15 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or not update.message or not update.message.text:
         return
 
-    # 1. تعريف المتغيرات الأساسية فوراً
     text = update.message.text.strip()
     u_name = update.effective_user.first_name
     current_chat_id = str(update.effective_chat.id).strip()
     u_id = update.effective_user.id
+
+    print(
+        f"MSG | chat={current_chat_id} | user={u_id} | text={text}"
+    )
+
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
     
     # 2. تعريف الصلاحيات
