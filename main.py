@@ -2,11 +2,10 @@ import logging
 import random
 import asyncio
 import os
-from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, CommandHandler, filters, PicklePersistence
+from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, CommandHandler, filters, PicklePersistence, ContextTypes
 from config import BOT_TOKEN, OWNER_ID, GROUP_IDS
 from handlers.games_handler import handle_messages, callback_handler
 from telegram import Update
-from telegram.ext import ContextTypes
 from royal_messages import GUESS_START_ANNOUNCEMENT
 from hunter import hunter_handler
 
@@ -102,16 +101,18 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             return
 
-    # --- ثانياً: فحص القروبات ---
+    # --- ثانياً: فحص القروبات (تعديل لاستقبال الجميع) ---
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
     
-    if chat_id not in allowed_groups and u_id != OWNER_ID:
+    # حذفنا شرط الـ OWNER_ID من هنا لضمان تمرير رسائل الأعضاء للـ handle_messages
+    if chat_id not in allowed_groups:
         return
 
     # --- تم تمرير الرسالة ---
     logging.info("✅ الرسالة وصلت إلى handle_messages")
 
     if update.message.text or update.message.photo:
+        # هنا سيستقبل البوت مشاركة الأعضاء والأشراف معاً
         await handle_messages(update, context)
 
 
