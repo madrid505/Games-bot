@@ -1,7 +1,7 @@
 import logging
 import random
 import asyncio
-import os  # إضافة مكتبة النظام
+import os
 from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, CommandHandler, filters, PicklePersistence
 from config import BOT_TOKEN, OWNER_ID, GROUP_IDS
 from handlers.games_handler import handle_messages, callback_handler
@@ -55,7 +55,6 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """المعالج الرئيسي للرسائل"""
 
     if not update.message:
-        logging.info("❌ تجاهل: لا يوجد message في update")
         return
 
     u_id = update.effective_user.id
@@ -86,23 +85,27 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             del context.user_data['awaiting_guess_for']
 
+            # 1. الرد في الخاص للمشرف
             await update.message.reply_text(
                 f"✅ **تم الاعتماد!** الرقم السري هو ({text}). بدأ العد التنازلي في المجموعة."
             )
 
+            # 2. إرسال رسالة التذكير للمجموعة
+            try:
+                await context.bot.send_message(
+                    chat_id=target_chat_id,
+                    text=GUESS_START_ANNOUNCEMENT.format(hint_content=hint_content),
+                    parse_mode='Markdown'
+                )
+            except Exception as e:
+                logging.error(f"فشل إرسال رسالة التخمين للمجموعة: {e}")
+            
             return
 
-    # --- فحص القروبات ---
+    # --- ثانياً: فحص القروبات ---
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
-
-    logging.info(f"🔍 فحص القروب: {chat_id}")
-    logging.info(f"📋 القروبات المسموحة: {allowed_groups}")
-
-    # --- التحقق من السماح ---
+    
     if chat_id not in allowed_groups and u_id != OWNER_ID:
-        logging.warning(
-            f"🚫 رسالة مرفوضة | user={u_id} | chat={chat_id} | السبب: القروب غير مسموح أو المستخدم ليس OWNER"
-        )
         return
 
     # --- تم تمرير الرسالة ---
@@ -113,12 +116,14 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+    # استخدام المسار المرتبط بالـ Volume
     volume_path = "/app/data"
     games_dir = os.path.join(volume_path, "games_data")
 
     if not os.path.exists(games_dir):
         os.makedirs(games_dir)
 
+    # ربط الـ persistence بمجلد البيانات الدائم
     persistence = PicklePersistence(filepath=os.path.join(games_dir, "games_persistence"))
 
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
