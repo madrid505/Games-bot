@@ -152,9 +152,10 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     is_admin = u_id == OWNER_ID or u_id in admins
 
-    # 3. البوابة الأمنية
-    if not is_admin and current_chat_id not in allowed_groups:
+    # 3. البوابة الأمنية (تعديل للسماح للأعضاء)
+    if current_chat_id not in allowed_groups:
         return
+
 
     # 4. بقية العمليات
     if check_and_reset_timers():
