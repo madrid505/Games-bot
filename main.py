@@ -101,7 +101,7 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             return
 
-    # --- ثانياً: فحص القروبات (تعديل لاستقبال الجميع) ---
+    # --- ثانياً: فحص القروبات ---
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
     
     if chat_id not in allowed_groups:
@@ -111,11 +111,20 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("✅ الرسالة وصلت إلى handle_messages")
 
     if update.message.text or update.message.photo:
-        # هنا سيستقبل البوت مشاركة الأعضاء والأشراف معاً
         await handle_messages(update, context)
 
 
 def main():
+    # --- التعديل الجديد: تنظيف حالة الـ persistence عند كل بداية (Restart) ---
+    persistence_path = "/app/data/games_data/games_persistence"
+    if os.path.exists(persistence_path):
+        try:
+            os.remove(persistence_path)
+            print("👑 تم تنظيف ملف الـ persistence لضمان استقرار البوت!")
+        except Exception as e:
+            print(f"⚠️ تعذر حذف ملف الـ persistence: {e}")
+    # ----------------------------------------------------------------------
+
     # استخدام المسار المرتبط بالـ Volume
     volume_path = "/app/data"
     games_dir = os.path.join(volume_path, "games_data")
