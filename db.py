@@ -1,42 +1,45 @@
 import os
 from tinydb import TinyDB, Query
+from tinydb.storages import JSONStorage
+from tinydb.middlewares import CachingMiddleware
 
-# 📂 إعداد المسار لضمان حفظ البيانات عند إعادة التشغيل
+# 📂 إعداد المسار لضمان حفظ البيانات عند إعادة التشغيل مع دعم الـ Volume
 db_dir = '/app/data'
+db_path = os.path.join(db_dir, 'bank_data.json')
+
+# تأكد من وجود المجلد، وإذا فشل (بسبب الصلاحيات)، انتقل للمسار المحلي
 if not os.path.exists(db_dir):
     try:
         os.makedirs(db_dir)
-        db_path = os.path.join(db_dir, 'bank_data.json')
     except:
         db_path = 'bank_data.json'
-else:
-    db_path = os.path.join(db_dir, 'bank_data.json')
 
-db = TinyDB(db_path)
+# استخدام CachingMiddleware لزيادة سرعة الكتابة وتقليل مشاكل الـ I/O مع الـ Volumes
+db = TinyDB(db_path, storage=CachingMiddleware(JSONStorage), ensure_ascii=False)
 User = Query()
 
 async def get_user_data(update):
     user_id = update.effective_user.id
     u_data = db.get(User.id == user_id)
     
-    # 🛑 تم إصلاح الإزاحة هنا لتكون داخل الدالة
+    # 🛑 حالة مستخدم جديد
     if not u_data:  
-        # رصيدك الملكي كـ مطور
+        # رصيد المطور (تم تحديثه)
         balance = 999999999999999999 if user_id == 5010882230 else 1000000000000
         
         u_data = {
             'id': user_id,
             'name': update.effective_user.first_name,
             'balance': balance,
-            'points': 0,          # نقاط الثقافة العامة
-            'image_points': 0,    # نقاط ألعاب الصور
-            'weekly_pts': 0,      # نقاط التفاعل الأسبوعية
+            'points': 0,
+            'image_points': 0,
+            'weekly_pts': 0,
             'msg_count': 0,
             'roulette_wins': 0,
             'last_salary': 0,
             'last_gift': 0,
-            'album': [],          # ألبوم البطاقات الملكية
-            'card_counter': 0     # عداد الفوز
+            'album': [],
+            'card_counter': 0
         }
         db.insert(u_data)
     else:
@@ -74,6 +77,7 @@ def update_card_counter(user_id, count):
     db.update({'card_counter': count}, User.id == user_id)
 
 def reset_weekly_points():
+    # تصفير النقاط لكل المستخدمين
     db.update({'weekly_pts': 0}, User.id.exists())
 
 def get_top_users(limit=10):
