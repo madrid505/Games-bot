@@ -70,9 +70,9 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_chat_id = context.user_data.get('awaiting_guess_for')
 
         if target_chat_id and text and text.isdigit():
-            logging.info("👑 تم إدخال رقم تخمين من الخاص")
+            logging.info(f"👑 تم إدخال رقم تخمين من الخاص: {text}")
 
-            context.bot_data[f"guess_ans_{target_chat_id}"] = text
+            context.bot_data[f"guess_ans_{target_chat_id}"] = str(text)
 
             secret_num = int(text)
             total_range = random.randint(45, 60)
@@ -104,7 +104,6 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- ثانياً: فحص القروبات (تعديل لاستقبال الجميع) ---
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
     
-    # حذفنا شرط الـ OWNER_ID من هنا لضمان تمرير رسائل الأعضاء للـ handle_messages
     if chat_id not in allowed_groups:
         return
 
