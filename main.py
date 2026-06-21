@@ -111,8 +111,8 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # 3. جدولة التذكير كل 15 ثانية
                 context.job_queue.run_repeating(
                     send_reminder_job, 
-                    interval=15, 
-                    first=15, 
+                    interval=10, 
+                    first=10, 
                     chat_id=chat_id_to_send,
                     data=hint_content,
                     name=f"guess_{chat_id_to_send}"
@@ -169,7 +169,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), catch_ids))
     app.add_handler(CallbackQueryHandler(callback_handler))
 
-    print("👑 إمبراطورية مونوبولي تعمل الآن مع نظام التخمين الدوري (15 ثانية)...")
+    print("👑 إمبراطورية مونوبولي تعمل الآن مع نظام التخمين الدوري (10 ثانية)...")
     app.run_polling(drop_pending_updates=True)
 
 
