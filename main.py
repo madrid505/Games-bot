@@ -63,7 +63,7 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =========================
     # 🔥 DEBUG LOGGING SYSTEM
     # =========================
-    logging.info(f"📩 رسالة جديدة | user={u_id} | chat={chat_id} | text={text}")
+    #logging.info(f"📩 رسالة جديدة | user={u_id} | chat={chat_id} | text={text}")
 
     # --- أولاً: معالجة المشرف في الخاص ---
     if update.effective_chat.type == 'private':
