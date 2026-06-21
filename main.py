@@ -153,8 +153,9 @@ def main():
 
     persistence = PicklePersistence(filepath=os.path.join(games_dir, "games_persistence"))
 
-    app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).job_queue(True).build()
-
+    
+    app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
+  
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("getid", get_id))
     app.add_handler(hunter_handler)
