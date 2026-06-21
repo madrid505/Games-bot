@@ -65,14 +65,22 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =========================
     #logging.info(f"📩 رسالة جديدة | user={u_id} | chat={chat_id} | text={text}")
 
-    # --- أولاً: معالجة المشرف في الخاص ---
+        # --- أولاً: معالجة المشرف في الخاص ---
     if update.effective_chat.type == 'private':
-        target_chat_id = context.user_data.get('awaiting_guess_for')
+        # استخدام pop للحصول على القيمة وحذفها بأمان في خطوة واحدة
+        target_chat_id = context.user_data.pop('awaiting_guess_for', None)
 
         if target_chat_id and text and text.isdigit():
-            logging.info(f"👑 تم إدخال رقم تخمين من الخاص: {text}")
+            try:
+                # التأكد من أن الـ ID رقم صحيح لتجنب مشاكل Telegram API
+                chat_id_to_send = int(target_chat_id)
+            except ValueError:
+                logging.error(f"خطأ: معرف المجموعة {target_chat_id} ليس رقماً صحيحاً")
+                return
 
-            context.bot_data[f"guess_ans_{target_chat_id}"] = str(text)
+            logging.info(f"👑 تم إدخال رقم تخمين من الخاص للقروب: {chat_id_to_send}")
+
+            context.bot_data[f"guess_ans_{chat_id_to_send}"] = str(text)
 
             secret_num = int(text)
             total_range = random.randint(45, 60)
@@ -82,8 +90,6 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             hint_content = f"الرقم بين: `{lower_bound}` و `{upper_bound}`"
 
-            del context.user_data['awaiting_guess_for']
-
             # 1. الرد في الخاص للمشرف
             await update.message.reply_text(
                 f"✅ **تم الاعتماد!** الرقم السري هو ({text}). بدأ العد التنازلي في المجموعة."
@@ -92,14 +98,15 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 2. إرسال رسالة التذكير للمجموعة
             try:
                 await context.bot.send_message(
-                    chat_id=target_chat_id,
+                    chat_id=chat_id_to_send,
                     text=GUESS_START_ANNOUNCEMENT.format(hint_content=hint_content),
                     parse_mode='Markdown'
                 )
             except Exception as e:
-                logging.error(f"فشل إرسال رسالة التخمين للمجموعة: {e}")
+                logging.error(f"فشل إرسال رسالة التخمين للمجموعة {chat_id_to_send}: {e}")
             
             return
+            
 
     # --- ثانياً: فحص القروبات ---
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
@@ -108,7 +115,7 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # --- تم تمرير الرسالة ---
-    logging.info("✅ الرسالة وصلت إلى handle_messages")
+    #logging.info("✅ الرسالة وصلت إلى handle_messages")
 
     if update.message.text or update.message.photo:
         await handle_messages(update, context)
