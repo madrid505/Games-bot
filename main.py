@@ -15,12 +15,24 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+# --- دالة التذكير الدوري (تُستدعى كل 15 ثانية) ---
+async def send_reminder_job(context: ContextTypes.DEFAULT_TYPE):
+    job = context.job
+    hint = job.data 
+    try:
+        await context.bot.send_message(
+            chat_id=job.chat_id,
+            text=f"📢 **تذكير ملكي:**\n{hint}\n\nسارعوا بفك الرقم قبل فوات الأوان!",
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logging.error(f"فشل إرسال التذكير الدوري: {e}")
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أمر البداية خاصة عند الدخول من زر التخمين في الخاص"""
     u_id = update.effective_user.id
 
     if update.effective_chat.type == 'private':
-
         if context.args and context.args[0].startswith("guess_"):
             parts = context.args[0].split("_")
             target_chat_id = parts[1]
@@ -60,19 +72,12 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip() if update.message.text else ""
     chat_id = str(update.effective_chat.id)
 
-    # =========================
-    # 🔥 DEBUG LOGGING SYSTEM
-    # =========================
-    #logging.info(f"📩 رسالة جديدة | user={u_id} | chat={chat_id} | text={text}")
-
-        # --- أولاً: معالجة المشرف في الخاص ---
+    # --- أولاً: معالجة المشرف في الخاص ---
     if update.effective_chat.type == 'private':
-        # استخدام pop للحصول على القيمة وحذفها بأمان في خطوة واحدة
         target_chat_id = context.user_data.pop('awaiting_guess_for', None)
 
         if target_chat_id and text and text.isdigit():
             try:
-                # التأكد من أن الـ ID رقم صحيح لتجنب مشاكل Telegram API
                 chat_id_to_send = int(target_chat_id)
             except ValueError:
                 logging.error(f"خطأ: معرف المجموعة {target_chat_id} ليس رقماً صحيحاً")
@@ -95,12 +100,22 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ **تم الاعتماد!** الرقم السري هو ({text}). بدأ العد التنازلي في المجموعة."
             )
 
-            # 2. إرسال رسالة التذكير للمجموعة
+            # 2. إرسال رسالة التذكير الأولى
             try:
                 await context.bot.send_message(
                     chat_id=chat_id_to_send,
                     text=GUESS_START_ANNOUNCEMENT.format(hint_content=hint_content),
                     parse_mode='Markdown'
+                )
+                
+                # 3. جدولة التذكير كل 15 ثانية
+                context.job_queue.run_repeating(
+                    send_reminder_job, 
+                    interval=15, 
+                    first=15, 
+                    chat_id=chat_id_to_send,
+                    data=hint_content,
+                    name=f"guess_{chat_id_to_send}"
                 )
             except Exception as e:
                 logging.error(f"فشل إرسال رسالة التخمين للمجموعة {chat_id_to_send}: {e}")
@@ -115,14 +130,12 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # --- تم تمرير الرسالة ---
-    #logging.info("✅ الرسالة وصلت إلى handle_messages")
-
     if update.message.text or update.message.photo:
         await handle_messages(update, context)
 
 
 def main():
-    # --- التعديل الجديد: تنظيف حالة الـ persistence عند كل بداية (Restart) ---
+    # --- تنظيف حالة الـ persistence ---
     persistence_path = "/app/data/games_data/games_persistence"
     if os.path.exists(persistence_path):
         try:
@@ -130,7 +143,6 @@ def main():
             print("👑 تم تنظيف ملف الـ persistence لضمان استقرار البوت!")
         except Exception as e:
             print(f"⚠️ تعذر حذف ملف الـ persistence: {e}")
-    # ----------------------------------------------------------------------
 
     # استخدام المسار المرتبط بالـ Volume
     volume_path = "/app/data"
@@ -139,7 +151,6 @@ def main():
     if not os.path.exists(games_dir):
         os.makedirs(games_dir)
 
-    # ربط الـ persistence بمجلد البيانات الدائم
     persistence = PicklePersistence(filepath=os.path.join(games_dir, "games_persistence"))
 
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
@@ -151,7 +162,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), catch_ids))
     app.add_handler(CallbackQueryHandler(callback_handler))
 
-    print("👑 إمبراطورية مونوبولي تعمل الآن مع نظام Debug كامل...")
+    print("👑 إمبراطورية مونوبولي تعمل الآن مع نظام التخمين الدوري (15 ثانية)...")
     app.run_polling(drop_pending_updates=True)
 
 
