@@ -189,7 +189,9 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     active_g = context.bot_data.get(f"guess_ans_{update.effective_chat.id}")
     if active_g is not None and str(text) == str(active_g):
         del context.bot_data[f"guess_ans_{update.effective_chat.id}"]
-        
+        current_jobs = context.job_queue.get_jobs_by_name(f"guess_{update.effective_chat.id}")
+        for job in current_jobs: job.schedule_removal()
+            
         prize = 100000
         current_wins = u_data.get('guess_wins', 0) + 1
         db.update({
