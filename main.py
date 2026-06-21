@@ -155,7 +155,11 @@ def main():
 
     
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
-  
+      if app.job_queue is None:
+        from telegram.ext import JobQueue
+        app.job_queue = JobQueue()
+        app.job_queue.set_application(app)
+          
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("getid", get_id))
     app.add_handler(hunter_handler)
