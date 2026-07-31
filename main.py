@@ -1,13 +1,18 @@
+import os
+
+# فرض التوكن الجديد قسراً لتجاوز أي توكن قديم أو متغير بيئة معطل
+os.environ["8613134391:AAEymWFBRl2Yi_zLIe9e6Txpx3e-knqY4sQ"] = "الضع_هنا_التوكن_الجديد_الكامل_الذي_أنشأته_من_BotFather"
+
 import logging
 import random
 import asyncio
-import os
 from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, CommandHandler, filters, PicklePersistence, ContextTypes
 from config import BOT_TOKEN, OWNER_ID, GROUP_IDS
 from handlers.games_handler import handle_messages, callback_handler
 from telegram import Update
 from royal_messages import GUESS_START_ANNOUNCEMENT
 from hunter import hunter_handler
+
 
 # إعداد السجلات
 logging.basicConfig(
