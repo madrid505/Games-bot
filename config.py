@@ -2,7 +2,7 @@
 
 # --- الإعدادات الأساسية للاتصال ---
 OWNER_ID = 5010882230
-BOT_TOKEN = "8613134391:AAFOgwyMzHMqp44rAAt6O7heenhZ5jrtY98"
+BOT_TOKEN = "8613134391:AAEymWFBRl2Yi_zLIe9e6Txpx3e-knqY4sQ"
 # اجعلها هكذا في ملف config.py
 GROUP_IDS = [
     -1004432647304,
