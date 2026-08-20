@@ -5,7 +5,7 @@ import sqlite3
 import os
 import io
 import random
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
@@ -60,48 +60,67 @@ def _seed_territories():
 init_db()
 
 # ==========================================
-# محرك رسم الخريطة بتقنية ثلاثية الأبعاد
+# محرك رسم الخريطة بتقنية ثلاثية الأبعاد الفاخرة
 # ==========================================
 def generate_3d_map_image():
-    width, height = 800, 800
-    image = Image.new("RGB", (width, height), color=(10, 15, 30))
+    width, height = 1000, 1000
+    image = Image.new("RGB", (width, height), color=(15, 20, 35))
     draw = ImageDraw.Draw(image)
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT T.id, T.name, T.owner_id, E.color_code FROM territories T LEFT JOIN empires E ON T.owner_id = E.user_id")
+    cursor.execute("""
+        SELECT T.id, T.name, T.owner_id, E.empire_name, E.color_code 
+        FROM territories T 
+        LEFT JOIN empires E ON T.owner_id = E.user_id
+    """)
     territories = cursor.fetchall()
     conn.close()
 
-    start_x, start_y = 200, 150
-    default_color = (40, 50, 70)
-    border_color = (212, 175, 55)
+    try:
+        font = ImageFont.truetype("arial.ttf", 16)
+        font_small = ImageFont.truetype("arial.ttf", 13)
+    except:
+        font = ImageFont.load_default()
+        font_small = font
+
+    start_x, start_y = 280, 120
+    tile_w, tile_h = 160, 80
 
     idx = 0
     for row in range(4):
         for col in range(4):
-            x = start_x + (col * 110) - (row * 50)
-            y = start_y + (row * 80)
+            x = start_x + (col * 110) - (row * 110)
+            y = start_y + (row * 65) + (col * 65)
             
             t_data = territories[idx] if idx < len(territories) else None
-            box_color = default_color
-            if t_data and t_data[3]:
-                try:
-                    hex_c = t_data[3].lstrip('#')
-                    box_color = tuple(int(hex_c[i:i+2], 16) for i in (0, 2, 4))
-                except:
-                    pass
+            
+            box_color = (45, 55, 75)
+            border_color = (212, 175, 55)
+            owner_text = "منطقة محايدة"
+            
+            if t_data and t_data[2] is not None:
+                owner_text = t_data[3] if t_data[3] else "مملكة المسيطر"
+                if t_data[4]:
+                    try:
+                        hex_c = t_data[4].lstrip('#')
+                        box_color = tuple(int(hex_c[i:i+2], 16) for i in (0, 2, 4))
+                    except:
+                        box_color = (70, 30, 90)
 
             points = [
-                (x, y + 40),
-                (x + 80, y),
-                (x + 160, y + 40),
-                (x + 80, y + 80)
+                (x, y + tile_h // 2),
+                (x + tile_w // 2, y),
+                (x + tile_w, y + tile_h // 2),
+                (x + tile_w // 2, y + tile_h)
             ]
+            
             draw.polygon(points, fill=box_color, outline=border_color)
             
-            name_text = t_data[1] if t_data else f"منطقة {idx+1}"
-            draw.text((x + 45, y + 35), name_text, fill=(255, 255, 255))
+            t_name = t_data[1] if t_data else f"منطقة {idx+1}"
+            
+            draw.text((x + 45, y + 22), t_name, fill=(255, 255, 255), font=font)
+            draw.text((x + 30, y + 42), owner_text[:12], fill=(200, 220, 255), font=font_small)
             
             idx += 1
 
@@ -112,21 +131,21 @@ def generate_3d_map_image():
     return bio
 
 # ==========================================
-# واجهة الأوامر والأزرار باللغة العربية بالكامل
+# واجهة الأوامر والأزرار (بدون فواصل أو رموز)
 # ==========================================
 def get_main_game_keyboard():
     keyboard = [
         [
-            InlineKeyboardButton("خريطة الإمبراطورية", callback_data="عرض_الخريطة"),
-            InlineKeyboardButton("دروع الدفاع", callback_data="دروع_الدفاع")
+            InlineKeyboardButton("عرض الخريطة", callback_data="عرض الخريطة"),
+            InlineKeyboardButton("دروع الدفاع", callback_data="دروع الدفاع")
         ],
         [
-            InlineKeyboardButton("تجنيد الجيش والمدرعات", callback_data="التجنيد"),
-            InlineKeyboardButton("إدارة المقاطعات والموارد", callback_data="المقاطعات")
+            InlineKeyboardButton("التجنيد", callback_data="التجنيد"),
+            InlineKeyboardButton("المقاطعات", callback_data="المقاطعات")
         ],
         [
-            InlineKeyboardButton("الخزينة الملكية", callback_data="الخزينة"),
-            InlineKeyboardButton("شن هجوم حربي", callback_data="قائمة_الهجوم")
+            InlineKeyboardButton("الخزينة", callback_data="الخزينة"),
+            InlineKeyboardButton("قائمة الهجوم", callback_data="قائمة الهجوم")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -180,7 +199,7 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
     data = query.data
     user_id = query.from_user.id
 
-    if data == "عرض_الخريطة":
+    if data == "عرض الخريطة":
         map_file = generate_3d_map_image()
         await query.message.reply_photo(
             photo=map_file,
@@ -189,7 +208,7 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode="Markdown"
         )
         
-    elif data == "دروع_الدفاع":
+    elif data == "دروع الدفاع":
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT shields, gold FROM empires WHERE user_id = ?", (user_id,))
@@ -204,13 +223,13 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             f"• تكلفة شحن درع جديد: **200 قطعة ذهب**.\n\n"
             f"رصيدك الحالي في الخزينة: 💰 {gold} ذهبة",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("شراء درع دفاعي جديد (200 ذهب)", callback_data="شراء_درع")],
-                [InlineKeyboardButton("رجوع للوحة الرئيسية", callback_data="الرئيسية")]
+                [InlineKeyboardButton("شراء درع جديد", callback_data="شراء درع")],
+                [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
             ]),
             parse_mode="Markdown"
         )
         
-    elif data == "شراء_درع":
+    elif data == "شراء درع":
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT shields, gold FROM empires WHERE user_id = ?", (user_id,))
@@ -246,14 +265,14 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             f"1. تجنيد 50 جندي (التكلفة: 100 ذهب)\n"
             f"2. صنع مدرعة حربية ثقيلة (التكلفة: 200 ذهب)",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("تجنيد 50 جندي (100 ذهب)", callback_data="تجنيد_جنود")],
-                [InlineKeyboardButton("صنع مدرعة حربية (200 ذهب)", callback_data="صنع_مدرعة")],
-                [InlineKeyboardButton("رجوع للوحة الرئيسية", callback_data="الرئيسية")]
+                [InlineKeyboardButton("تجنيد جنود", callback_data="تجنيد جنود")],
+                [InlineKeyboardButton("صنع مدرعة", callback_data="صنع مدرعة")],
+                [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
             ]),
             parse_mode="Markdown"
         )
 
-    elif data == "تجنيد_جنود":
+    elif data == "تجنيد جنود":
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT gold FROM empires WHERE user_id = ?", (user_id,))
@@ -267,7 +286,7 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
         conn.close()
         await handle_game_callbacks_refresh_recruitment(query, user_id)
 
-    elif data == "صنع_مدرعة":
+    elif data == "صنع مدرعة":
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT gold FROM empires WHERE user_id = ?", (user_id,))
@@ -294,14 +313,14 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             t_id, t_name, t_lvl, t_fac = t
             cost = (t_lvl * 150) if t_lvl <= 5 else (t_lvl * 500)
             text += f"• **{t_name}** | المستوى: {t_lvl} | المنشأة: {t_fac}\n"
-            keyboard_buttons.append([InlineKeyboardButton(f"ترقية {t_name} (تكلفة: {cost} ذهب)", callback_data=f"ترقية_{t_id}")])
+            keyboard_buttons.append([InlineKeyboardButton(f"ترقية {t_name}", callback_data=f"ترقية {t_id}")])
 
-        keyboard_buttons.append([InlineKeyboardButton("رجوع للوحة الرئيسية", callback_data="الرئيسية")])
+        keyboard_buttons.append([InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")])
         
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard_buttons), parse_mode="Markdown")
 
-    elif data.startswith("ترقية_"):
-        t_id = int(data.split("_")[1])
+    elif data.startswith("ترقية "):
+        t_id = int(data.split(" ")[1])
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT level, facility_type FROM territories WHERE id = ? AND owner_id = ?", (t_id, user_id))
@@ -343,15 +362,14 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             f"• المقاطعات المسيطر عليها: **{territories_count} مقاطعة**\n\n"
             f"تذكر: الترقية من المستوى 1 إلى 5 سهلة وسريعة، وبعد المستوى 5 تصبح التكلفة والصعوبة متوسطة لتحدي الأباطرة!",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("رجوع للوحة الرئيسية", callback_data="الرئيسية")]
+                [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
             ]),
             parse_mode="Markdown"
         )
 
-    elif data == "قائمة_الهجوم":
+    elif data == "قائمة الهجوم":
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        # عرض المقاطعات التي لا تملكها أو يمتلكها لاعبون آخرون
         cursor.execute("SELECT T.id, T.name, T.owner_id, E.username FROM territories T LEFT JOIN empires E ON T.owner_id = E.user_id WHERE T.owner_id IS NULL OR T.owner_id != ?", (user_id,))
         targets = cursor.fetchall()
         conn.close()
@@ -362,25 +380,23 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
 
         text = "⚔️ **قائمة أهداف الغزو العسكري المتاحة:**\nاختر مقاطعة لشن الهجوم عليها وسلب مواردها:\n"
         keyboard_buttons = []
-        for target in targets[:8]: # عرض أول 8 أهداف لترتيب الواجهة
+        for target in targets[:8]:
             t_id, t_name, owner_id, owner_name = target
             owner_label = f"مملكة: {owner_name}" if owner_name else "منطقة محايدة مستقلة"
             text += f"• **{t_name}** ({owner_label})\n"
-            keyboard_buttons.append([InlineKeyboardButton(f"⚔️ غزو وهجوم على: {t_name}", callback_data=f"هجوم_{t_id}")])
+            keyboard_buttons.append([InlineKeyboardButton(f"هجوم {t_name}", callback_data=f"هجوم {t_id}")])
 
-        keyboard_buttons.append([InlineKeyboardButton("رجوع للوحة الرئيسية", callback_data="الرئيسية")])
+        keyboard_buttons.append([InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")])
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard_buttons), parse_mode="Markdown")
 
-    elif data.startswith("هجوم_"):
-        target_t_id = int(data.split("_")[1])
+    elif data.startswith("هجوم "):
+        target_t_id = int(data.split(" ")[1])
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # جلب بيانات المهاجم
         cursor.execute("SELECT soldiers, armored_vehicles FROM empires WHERE user_id = ?", (user_id,))
         attacker_data = cursor.fetchone()
         
-        # جلب بيانات المقاطعة المستهدفة وصاحبها
         cursor.execute("SELECT name, owner_id FROM territories WHERE id = ?", (target_t_id,))
         target_t_data = cursor.fetchone()
         
@@ -392,20 +408,16 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
         att_soldiers, att_armored = attacker_data
         t_name, owner_id = target_t_data
 
-        # حساب القوة الهجومية للمهاجم
         attacker_power = (att_soldiers * 1) + (att_armored * 50)
 
         if owner_id is None:
-            # مقاطعة محايدة (سهلة الاحتلال)
             defender_power = 80
         else:
-            # مقاطعة لاعب آخر (فحص دروعه وجيشه)
             cursor.execute("SELECT soldiers, armored_vehicles, shields FROM empires WHERE user_id = ?", (owner_id,))
             defender_empire = cursor.fetchone()
             if defender_empire:
                 def_soldiers, def_armored, def_shields = defender_empire
                 if def_shields > 0:
-                    # الدرع يصد الهجوم الأول ويخصم درعاً للمدافع
                     cursor.execute("UPDATE empires SET shields = shields - 1 WHERE user_id = ?", (owner_id,))
                     conn.commit()
                     conn.close()
@@ -421,14 +433,11 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             else:
                 defender_power = 100
 
-        # نتيجة المعركة بناءً على القوة العسكرية
         if attacker_power >= defender_power:
-            # انتصار المهاجم
             loot = random.randint(300, 700)
             cursor.execute("UPDATE territories SET owner_id = ?, level = 1, facility_type = 'مزارع' WHERE id = ?", (user_id, target_t_id))
             cursor.execute("UPDATE empires SET gold = gold + ?, territories_count = territories_count + 1 WHERE user_id = ?", (loot, user_id))
             
-            # إذا كان لها صاحب سابق، نخفض عدد مقاطعاته
             if owner_id:
                 cursor.execute("UPDATE empires SET territories_count = MAX(0, territories_count - 1) WHERE user_id = ?", (owner_id,))
             
@@ -439,22 +448,20 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
                 f"🎉 **انتصار ساحق ومجيد يا جلالة الإمبراطور!**\n\n"
                 f"قواتك الباسلة دكت حصون مقاطعة **{t_name}** وسحقت دفاعاتها!\n"
                 f"• تم ضم المقاطعة إلى حدود إمبراطوريتك.\n"
-                f"• تم غנم غنائم الحرب: **+ {loot} قطعة ذهبية** إلى خزينتك الملكية.",
+                f"• تم غنم غنائم الحرب: **+ {loot} قطعة ذهبية** إلى خزينتك الملكية.",
                 reply_markup=get_main_game_keyboard(),
                 parse_mode="Markdown"
             )
         else:
-            # هزيمة المهاجم وفقدان بعض الجنود
             lost_soldiers = min(att_soldiers, random.randint(20, 50))
             cursor.execute("UPDATE empires SET soldiers = soldiers - ? WHERE user_id = ?", (lost_soldiers, user_id))
             conn.commit()
             conn.close()
 
             await query.message.edit_text(
-                f"❌ **تصدى العدو لهجومك الباسل!**\n\n"
-                f"كانت دفاعات مقاطعة **{t_name}** وجيشها أقوى من القوة المهاجمة.\n"
-                f"• خسائر المعركة: فقدان **{lost_soldiers} جندي** من صفوف جيشك.\n"
-                f"• حاول تطوير جنودك وصنع المزيد من المدرعات قبل إعادة الكرة!",
+                f"⚠️ **تصدى العدو لهجومك باقتدار!**\n\n"
+                f"فشلت القوات في اختراق تحصينات مقاطعة **{t_name}**.\n"
+                f"• خسائر المعركة: فقدان **{lost_soldiers} جندي** من صفوف الجيش.",
                 reply_markup=get_main_game_keyboard(),
                 parse_mode="Markdown"
             )
@@ -476,13 +483,12 @@ async def handle_game_callbacks_refresh_shields(query, user_id):
     
     await query.message.edit_text(
         f"🛡️ **نظام دروع الحماية الملكية**\n\n"
-        f"دروعك الحالية: **{shields} من 5 دروع** (الحد الأقصى).\n"
-        f"• كل هجوم يتعرض له دفاعك يستهلك درعاً واحداً.\n"
-        f"• تكلفة شحن درع جديد: **200 قطعة ذهب**.\n\n"
-        f"رصيدك الحالي في الخزينة: 💰 {gold} ذهبة",
+        f"دروعك الحالية: **{shields} من 5 دروع**.\n"
+        f"تكلفة شحن درع جديد: **200 قطعة ذهب**.\n\n"
+        f"رصيدك الحالي: 💰 {gold} ذهبة",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("شراء درع دفاعي جديد (200 ذهب)", callback_data="شراء_درع")],
-            [InlineKeyboardButton("رجوع للوحة الرئيسية", callback_data="الرئيسية")]
+            [InlineKeyboardButton("شراء درع جديد", callback_data="شراء درع")],
+            [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
         ]),
         parse_mode="Markdown"
     )
@@ -498,14 +504,12 @@ async def handle_game_callbacks_refresh_recruitment(query, user_id):
     await query.message.edit_text(
         f"⚔️ **ثكنة تجنيد الجيش والمدرعات الحربية**\n\n"
         f"• جنودك الحاليون: **{soldiers} جندي**\n"
-        f"• مدرعاتك الحربية: **{armored} مدرعة**\n\n"
-        f"خيارات التجنيد المتاحة:\n"
-        f"1. تجنيد 50 جندي (التكلفة: 100 ذهب)\n"
-        f"2. صنع مدرعة حربية ثقيلة (التكلفة: 200 ذهب)",
+        f"• مدرعاتك الحربية: **{armored} مدرعة**\n"
+        f"• رصيد الذهب: 💰 {gold}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("تجنيد 50 جندي (100 ذهب)", callback_data="تجنيد_جنود")],
-            [InlineKeyboardButton("صنع مدرعة حربية (200 ذهب)", callback_data="صنع_مدرعة")],
-            [InlineKeyboardButton("رجوع للوحة الرئيسية", callback_data="الرئيسية")]
+            [InlineKeyboardButton("تجنيد جنود", callback_data="تجنيد جنود")],
+            [InlineKeyboardButton("صنع مدرعة", callback_data="صنع مدرعة")],
+            [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
         ]),
         parse_mode="Markdown"
     )
