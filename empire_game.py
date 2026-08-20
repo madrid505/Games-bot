@@ -60,11 +60,11 @@ def _seed_territories():
 init_db()
 
 # ==========================================
-# محرك رسم الخريطة بتقنية ثلاثية الأبعاد الفاخرة
+# محرك رسم الخريطة بتقنية ثلاثية الأبعاد الفاخرة (مكبرة وواضحة جداً)
 # ==========================================
 def generate_3d_map_image():
-    width, height = 1000, 1000
-    image = Image.new("RGB", (width, height), color=(15, 20, 35))
+    width, height = 1400, 1200
+    image = Image.new("RGB", (width, height), color=(10, 15, 30))
     draw = ImageDraw.Draw(image)
     
     conn = sqlite3.connect(DB_PATH)
@@ -78,24 +78,29 @@ def generate_3d_map_image():
     conn.close()
 
     try:
-        font = ImageFont.truetype("arial.ttf", 16)
-        font_small = ImageFont.truetype("arial.ttf", 13)
+        font_title = ImageFont.truetype("arial.ttf", 24)
+        font = ImageFont.truetype("arial.ttf", 18)
+        font_small = ImageFont.truetype("arial.ttf", 14)
     except:
-        font = ImageFont.load_default()
-        font_small = font
+        font_title = ImageFont.load_default()
+        font = font_title
+        font_small = font_title
 
-    start_x, start_y = 280, 120
-    tile_w, tile_h = 160, 80
+    # رسم عنوان فاخر أعلى الخريطة
+    draw.text((450, 40), "👑 خريطة إمبراطورية مونوبولي الاستراتيجية 👑", fill=(212, 175, 55), font=font_title)
+
+    start_x, start_y = 380, 150
+    tile_w, tile_h = 220, 110
 
     idx = 0
     for row in range(4):
         for col in range(4):
-            x = start_x + (col * 110) - (row * 110)
-            y = start_y + (row * 65) + (col * 65)
+            x = start_x + (col * 140) - (row * 140)
+            y = start_y + (row * 90) + (col * 90)
             
             t_data = territories[idx] if idx < len(territories) else None
             
-            box_color = (45, 55, 75)
+            box_color = (30, 40, 65)
             border_color = (212, 175, 55)
             owner_text = "منطقة محايدة"
             
@@ -106,7 +111,7 @@ def generate_3d_map_image():
                         hex_c = t_data[4].lstrip('#')
                         box_color = tuple(int(hex_c[i:i+2], 16) for i in (0, 2, 4))
                     except:
-                        box_color = (70, 30, 90)
+                        box_color = (80, 30, 100)
 
             points = [
                 (x, y + tile_h // 2),
@@ -119,8 +124,8 @@ def generate_3d_map_image():
             
             t_name = t_data[1] if t_data else f"منطقة {idx+1}"
             
-            draw.text((x + 45, y + 22), t_name, fill=(255, 255, 255), font=font)
-            draw.text((x + 30, y + 42), owner_text[:12], fill=(200, 220, 255), font=font_small)
+            draw.text((x + 65, y + 30), f"🏰 {t_name}", fill=(255, 255, 255), font=font)
+            draw.text((x + 45, y + 60), f"👤 {owner_text[:15]}", fill=(212, 175, 55), font=font_small)
             
             idx += 1
 
