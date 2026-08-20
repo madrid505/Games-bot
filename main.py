@@ -182,7 +182,7 @@ def main():
     app.add_handler(CommandHandler("getid", get_id))
     app.add_handler(hunter_handler)
 
-    # --- تسجيل أوامر وأزرار إمبراطورية مونوبولي المحدثة (بالتعديلات المطلوبة) ---
+    # --- تسجيل أوامر وأزرار إمبراطورية مونوبولي المحدثة (بدون رموز وتستجيب للكلمة الصريحة والأزرار) ---
     app.add_handler(MessageHandler(filters.Regex("^امبراطورية$"), start_empire))
 
     app.add_handler(CallbackQueryHandler(
