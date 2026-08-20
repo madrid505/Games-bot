@@ -16,7 +16,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # جدول الإمبراطوريات / اللاعبين مع نظام الدروع، الجنود، والمدرعات الحربية
+    # جدول الإمبراطوريات / اللاعبين مع نظام الدروع، الجنود، والمدرعات الحربية والتحالف
     cursor.execute('''CREATE TABLE IF NOT EXISTS empires (
                         user_id INTEGER PRIMARY KEY,
                         username TEXT,
@@ -28,6 +28,14 @@ def init_db():
                         shields INTEGER DEFAULT 5,
                         territories_count INTEGER DEFAULT 1,
                         color_code TEXT
+                    )''')
+                    
+    # جدول التحالفات والأباطرة
+    cursor.execute('''CREATE TABLE IF NOT EXISTS alliances (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT UNIQUE,
+                        leader_id INTEGER,
+                        gold_bank INTEGER DEFAULT 0
                     )''')
                     
     # جدول المقاطعات الخريطة (شبكة 4x4 مع مستويات وأنواع إنتاج)
@@ -64,7 +72,6 @@ init_db()
 # ==========================================
 def generate_3d_map_image():
     width, height = 1400, 1200
-    # خلفية باللون الأزرق الداكن الفاخر (Midnight Blue)
     image = Image.new("RGB", (width, height), color=(11, 19, 43))
     draw = ImageDraw.Draw(image)
     
@@ -87,7 +94,6 @@ def generate_3d_map_image():
         font = font_title
         font_small = font_title
 
-    # رسم عنوان فاخر أعلى الخريطة باللون الذهبي المطفي
     draw.text((420, 35), "👑 خريطة إمبراطورية مونوبولي الاستراتيجية الأسطورية 👑", fill=(212, 175, 55), font=font_title)
 
     start_x, start_y = 380, 150
@@ -101,7 +107,6 @@ def generate_3d_map_image():
             
             t_data = territories[idx] if idx < len(territories) else None
             
-            # ألوان بتصميم كرتوني متناسق مع الأستيل الملكي (كحلي مع إطار ذهبي بارز)
             box_color = (25, 35, 65)
             border_color = (212, 175, 55)
             owner_text = "منطقة محايدة"
@@ -122,9 +127,7 @@ def generate_3d_map_image():
                 (x + tile_w // 2, y + tile_h)
             ]
             
-            # رسم المربع مع تأثير ثلاثي الأبعاد بارز
             draw.polygon(points, fill=box_color, outline=border_color)
-            
             t_name = t_data[1] if t_data else f"منطقة {idx+1}"
             
             draw.text((x + 65, y + 30), f"🏰 {t_name}", fill=(255, 255, 255), font=font)
@@ -154,6 +157,9 @@ def get_main_game_keyboard():
         [
             InlineKeyboardButton("💰 الخزينة", callback_data="الخزينة"),
             InlineKeyboardButton("🎯 قائمة الهجوم", callback_data="قائمة الهجوم")
+        ],
+        [
+            InlineKeyboardButton("🤝 مركز التحالفات", callback_data="التحالفات")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -200,7 +206,7 @@ async def start_empire(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-# معالجة تفاعل الأزرار بطريقة آمنة ومتكاملة تمنع أخطاء التعديل
+# معالجة تفاعل الأزرار بطريقة آمنة ومتكاملة
 async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -210,7 +216,6 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
     if data == "عرض الخريطة":
         map_file = generate_3d_map_image()
         try:
-            # إذا كانت الرسالة السابقة تحتوي على صورة، نقوم بتعديلها عبر InputMediaPhoto لمنع الأخطاء
             if query.message.photo:
                 await query.message.edit_media(
                     media=InputMediaPhoto(media=map_file, caption="🗺️ **خريطة العالم الاستراتيجية (ثلاثية الأبعاد)**\nالمناطق الملونة تعود للأباطرة المسيطرين!", parse_mode="Markdown"),
@@ -385,6 +390,87 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
             ])
         )
+
+    # ==========================================
+    # مركز التحالفات الجديد
+    # ==========================================
+    elif data == "التحالفات":
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT alliance_id FROM empires WHERE user_id = ?", (user_id,))
+        res = cursor.fetchone()
+        a_id = res[0] if res else None
+        
+        if a_id:
+            cursor.execute("SELECT name, gold_bank FROM alliances WHERE id = ?", (a_id,))
+            a_data = cursor.fetchone()
+            
+            cursor.execute("SELECT empire_name FROM empires WHERE alliance_id = ?", (a_id,))
+            members = cursor.fetchall()
+            members_list = ", ".join([m[0] for m in members])
+            
+            conn.close()
+            await safe_edit_or_reply(query,
+                f"🤝 **مركز تحالف الأباطرة: {a_data[0]}**\n\n"
+                f"💰 رصيد بنك التحالف: **{a_data[1]} قطعة ذهبية**\n"
+                f"👥 أعضاء التحالف: {members_list}\n\n"
+                f"يمكنك دعم بنك التحالف أو تنسيق الغزوات مع رفاقك!",
+                InlineKeyboardMarkup([
+                    [InlineKeyboardButton("مغادرة التحالف", callback_data="مغادرة_تحالف")],
+                    [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
+                ])
+            )
+        else:
+            conn.close()
+            await safe_edit_or_reply(query,
+                f"🤝 **مركز التحالفات الاستراتيجية**\n\n"
+                f"أنت لست منضماً لأي تحالف حالياً.\n"
+                f"• يمكنك إنشاء تحالف عظيم خاص بك يكلف **1000 قطعة ذهبية**.",
+                InlineKeyboardMarkup([
+                    [InlineKeyboardButton("إنشاء تحالف جديد", callback_data="إنشاء_تحالف")],
+                    [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
+                ])
+            )
+
+    elif data == "إنشاء_تحالف":
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT alliance_id, gold, empire_name FROM empires WHERE user_id = ?", (user_id,))
+        e_data = cursor.fetchone()
+        
+        if not e_data:
+            conn.close()
+            return
+            
+        a_id, gold, empire_name = e_data
+        if a_id:
+            conn.close()
+            await query.answer("أنت منضم بالفعل لتحالف مسبقاً!", show_alert=True)
+            return
+            
+        if gold < 1000:
+            conn.close()
+            await query.answer("رصيدك من الذهب لا يكفي لإنشاء تحالف (تحتاج إلى 1000 ذهب).", show_alert=True)
+            return
+            
+        # إنشاء التحالف خصماً من الذهب وتعيين القائد
+        cursor.execute("INSERT INTO alliances (name, leader_id, gold_bank) VALUES (?, ?, 0)", (f"تحالف {empire_name}", user_id))
+        new_a_id = cursor.lastrowid
+        cursor.execute("UPDATE empires SET alliance_id = ?, gold = gold - 1000 WHERE user_id = ?", (new_a_id, user_id))
+        conn.commit()
+        conn.close()
+        
+        await query.answer("تم تأسيس تحالفك الأسطوري بنجاح!", show_alert=True)
+        await handle_game_callbacks(update, context)
+
+    elif data == "مغادرة_تحالف":
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE empires SET alliance_id = NULL WHERE user_id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+        await query.answer("لقد غادرت التحالف بنجاح.", show_alert=True)
+        await handle_game_callbacks(update, context)
 
     elif data == "قائمة الهجوم":
         conn = sqlite3.connect(DB_PATH)
