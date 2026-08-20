@@ -183,7 +183,8 @@ def main():
     app.add_handler(hunter_handler)
 
     # --- تسجيل أوامر وأزرار إمبراطورية مونوبولي المحدثة (بالتعديلات المطلوبة) ---
-    app.add_handler(CommandHandler("امبراطورية", start_empire))  # تم التعديل ليصبح بدون همزة
+    app.add_handler(MessageHandler(filters.Regex("^امبراطورية$"), start_empire))
+
     app.add_handler(CallbackQueryHandler(
         handle_game_callbacks, 
         pattern="^(عرض الخريطة|دروع الدفاع|شراء درع|التجنيد|تجنيد جنود|صنع مدرعة|المقاطعات|ترقية |الخزينة|قائمة الهجوم|هجوم |الرئيسية)$"
