@@ -1,12 +1,12 @@
 # empire_game.py
-# ملف لعبة حرب الإمبراطوريات الأسطورية - تصميم ثلاثي الأبعاد وإدارة تفاعلية متكاملة باللغة العربية
+# ملف لعبة حرب الإمبراطوريات الأسطورية - تصميم كرتوني ثلاثي الأبعاد فاخر وإدارة تفاعلية متكاملة باللغة العربية
 
 import sqlite3
 import os
 import io
 import random
 from PIL import Image, ImageDraw, ImageFont
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InputMediaPhoto
 from telegram.ext import ContextTypes
 
 # إعداد قاعدة البيانات الخاصة باللعبة
@@ -60,11 +60,12 @@ def _seed_territories():
 init_db()
 
 # ==========================================
-# محرك رسم الخريطة بتقنية ثلاثية الأبعاد الفاخرة (مكبرة وواضحة جداً)
+# محرك رسم الخريطة بتقنية كرتونية ثلاثية الأبعاد فاخرة (باللون الكحلي والذهبي الملكي)
 # ==========================================
 def generate_3d_map_image():
     width, height = 1400, 1200
-    image = Image.new("RGB", (width, height), color=(10, 15, 30))
+    # خلفية باللون الأزرق الداكن الفاخر (Midnight Blue)
+    image = Image.new("RGB", (width, height), color=(11, 19, 43))
     draw = ImageDraw.Draw(image)
     
     conn = sqlite3.connect(DB_PATH)
@@ -78,7 +79,7 @@ def generate_3d_map_image():
     conn.close()
 
     try:
-        font_title = ImageFont.truetype("arial.ttf", 24)
+        font_title = ImageFont.truetype("arial.ttf", 26)
         font = ImageFont.truetype("arial.ttf", 18)
         font_small = ImageFont.truetype("arial.ttf", 14)
     except:
@@ -86,8 +87,8 @@ def generate_3d_map_image():
         font = font_title
         font_small = font_title
 
-    # رسم عنوان فاخر أعلى الخريطة
-    draw.text((450, 40), "👑 خريطة إمبراطورية مونوبولي الاستراتيجية 👑", fill=(212, 175, 55), font=font_title)
+    # رسم عنوان فاخر أعلى الخريطة باللون الذهبي المطفي
+    draw.text((420, 35), "👑 خريطة إمبراطورية مونوبولي الاستراتيجية الأسطورية 👑", fill=(212, 175, 55), font=font_title)
 
     start_x, start_y = 380, 150
     tile_w, tile_h = 220, 110
@@ -100,7 +101,8 @@ def generate_3d_map_image():
             
             t_data = territories[idx] if idx < len(territories) else None
             
-            box_color = (30, 40, 65)
+            # ألوان بتصميم كرتوني متناسق مع الأستيل الملكي (كحلي مع إطار ذهبي بارز)
+            box_color = (25, 35, 65)
             border_color = (212, 175, 55)
             owner_text = "منطقة محايدة"
             
@@ -111,7 +113,7 @@ def generate_3d_map_image():
                         hex_c = t_data[4].lstrip('#')
                         box_color = tuple(int(hex_c[i:i+2], 16) for i in (0, 2, 4))
                     except:
-                        box_color = (80, 30, 100)
+                        box_color = (60, 40, 90)
 
             points = [
                 (x, y + tile_h // 2),
@@ -120,12 +122,13 @@ def generate_3d_map_image():
                 (x + tile_w // 2, y + tile_h)
             ]
             
+            # رسم المربع مع تأثير ثلاثي الأبعاد بارز
             draw.polygon(points, fill=box_color, outline=border_color)
             
             t_name = t_data[1] if t_data else f"منطقة {idx+1}"
             
             draw.text((x + 65, y + 30), f"🏰 {t_name}", fill=(255, 255, 255), font=font)
-            draw.text((x + 45, y + 60), f"👤 {owner_text[:15]}", fill=(212, 175, 55), font=font_small)
+            draw.text((x + 40, y + 60), f"👤 {owner_text[:14]}", fill=(212, 175, 55), font=font_small)
             
             idx += 1
 
@@ -136,21 +139,21 @@ def generate_3d_map_image():
     return bio
 
 # ==========================================
-# واجهة الأوامر والأزرار (بدون فواصل أو رموز)
+# واجهة الأوامر والأزرار
 # ==========================================
 def get_main_game_keyboard():
     keyboard = [
         [
-            InlineKeyboardButton("عرض الخريطة", callback_data="عرض الخريطة"),
-            InlineKeyboardButton("دروع الدفاع", callback_data="دروع الدفاع")
+            InlineKeyboardButton("🗺️ عرض الخريطة", callback_data="عرض الخريطة"),
+            InlineKeyboardButton("🛡️ دروع الدفاع", callback_data="دروع الدفاع")
         ],
         [
-            InlineKeyboardButton("التجنيد", callback_data="التجنيد"),
-            InlineKeyboardButton("المقاطعات", callback_data="المقاطعات")
+            InlineKeyboardButton("⚔️ التجنيد", callback_data="التجنيد"),
+            InlineKeyboardButton("🏛️ المقاطعات", callback_data="المقاطعات")
         ],
         [
-            InlineKeyboardButton("الخزينة", callback_data="الخزينة"),
-            InlineKeyboardButton("قائمة الهجوم", callback_data="قائمة الهجوم")
+            InlineKeyboardButton("💰 الخزينة", callback_data="الخزينة"),
+            InlineKeyboardButton("🎯 قائمة الهجوم", callback_data="قائمة الهجوم")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -197,7 +200,7 @@ async def start_empire(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-# معالجة تفاعل الأزرار
+# معالجة تفاعل الأزرار بطريقة آمنة ومتكاملة تمنع أخطاء التعديل
 async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -206,12 +209,27 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
 
     if data == "عرض الخريطة":
         map_file = generate_3d_map_image()
-        await query.message.reply_photo(
-            photo=map_file,
-            caption="🗺️ **خريطة العالم الاستراتيجية (ثلاثية الأبعاد)**\nالمناطق الملونة تعود للأباطرة المسيطرين!",
-            reply_markup=get_main_game_keyboard(),
-            parse_mode="Markdown"
-        )
+        try:
+            # إذا كانت الرسالة السابقة تحتوي على صورة، نقوم بتعديلها عبر InputMediaPhoto لمنع الأخطاء
+            if query.message.photo:
+                await query.message.edit_media(
+                    media=InputMediaPhoto(media=map_file, caption="🗺️ **خريطة العالم الاستراتيجية (ثلاثية الأبعاد)**\nالمناطق الملونة تعود للأباطرة المسيطرين!", parse_mode="Markdown"),
+                    reply_markup=get_main_game_keyboard()
+                )
+            else:
+                await query.message.reply_photo(
+                    photo=map_file,
+                    caption="🗺️ **خريطة العالم الاستراتيجية (ثلاثية الأبعاد)**\nالمناطق الملونة تعود للأباطرة المسيطرين!",
+                    reply_markup=get_main_game_keyboard(),
+                    parse_mode="Markdown"
+                )
+        except Exception:
+            await query.message.reply_photo(
+                photo=map_file,
+                caption="🗺️ **خريطة العالم الاستراتيجية (ثلاثية الأبعاد)**\nالمناطق الملونة تعود للأباطرة المسيطرين!",
+                reply_markup=get_main_game_keyboard(),
+                parse_mode="Markdown"
+            )
         
     elif data == "دروع الدفاع":
         conn = sqlite3.connect(DB_PATH)
@@ -221,17 +239,16 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
         conn.close()
         shields, gold = res if res else (5, 0)
         
-        await query.message.edit_text(
+        await safe_edit_or_reply(query, 
             f"🛡️ **نظام دروع الحماية الملكية**\n\n"
             f"دروعك الحالية: **{shields} من 5 دروع** (الحد الأقصى).\n"
             f"• كل هجوم يتعرض له دفاعك يستهلك درعاً واحداً.\n"
             f"• تكلفة شحن درع جديد: **200 قطعة ذهب**.\n\n"
             f"رصيدك الحالي في الخزينة: 💰 {gold} ذهبة",
-            reply_markup=InlineKeyboardMarkup([
+            InlineKeyboardMarkup([
                 [InlineKeyboardButton("شراء درع جديد", callback_data="شراء درع")],
                 [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
-            ]),
-            parse_mode="Markdown"
+            ])
         )
         
     elif data == "شراء درع":
@@ -262,19 +279,18 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
         conn.close()
         soldiers, armored, gold = res if res else (150, 5, 0)
         
-        await query.message.edit_text(
+        await safe_edit_or_reply(query,
             f"⚔️ **ثكنة تجنيد الجيش والمدرعات الحربية**\n\n"
             f"• جنودك الحاليون: **{soldiers} جندي**\n"
             f"• مدرعاتك الحربية: **{armored} مدرعة**\n\n"
             f"خيارات التجنيد المتاحة:\n"
             f"1. تجنيد 50 جندي (التكلفة: 100 ذهب)\n"
             f"2. صنع مدرعة حربية ثقيلة (التكلفة: 200 ذهب)",
-            reply_markup=InlineKeyboardMarkup([
+            InlineKeyboardMarkup([
                 [InlineKeyboardButton("تجنيد جنود", callback_data="تجنيد جنود")],
                 [InlineKeyboardButton("صنع مدرعة", callback_data="صنع مدرعة")],
                 [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
-            ]),
-            parse_mode="Markdown"
+            ])
         )
 
     elif data == "تجنيد جنود":
@@ -316,13 +332,12 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard_buttons = []
         for t in territories:
             t_id, t_name, t_lvl, t_fac = t
-            cost = (t_lvl * 150) if t_lvl <= 5 else (t_lvl * 500)
             text += f"• **{t_name}** | المستوى: {t_lvl} | المنشأة: {t_fac}\n"
             keyboard_buttons.append([InlineKeyboardButton(f"ترقية {t_name}", callback_data=f"ترقية {t_id}")])
 
         keyboard_buttons.append([InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")])
         
-        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard_buttons), parse_mode="Markdown")
+        await safe_edit_or_reply(query, text, InlineKeyboardMarkup(keyboard_buttons))
 
     elif data.startswith("ترقية "):
         t_id = int(data.split(" ")[1])
@@ -349,7 +364,7 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
                 await query.answer(f"تم ترقية المقاطعة بنجاح إلى المستوى {current_lvl + 1}!", show_alert=True)
         conn.close()
         
-        await query.message.edit_text("🏰 **تمت ترقية المقاطعة بنجاح وزادت قدرتها الإنتاجية!**", reply_markup=get_main_game_keyboard(), parse_mode="Markdown")
+        await safe_edit_or_reply(query, "🏰 **تمت ترقية المقاطعة بنجاح وزادت قدرتها الإنتاجية!**", get_main_game_keyboard())
 
     elif data == "الخزينة":
         conn = sqlite3.connect(DB_PATH)
@@ -359,17 +374,16 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
         conn.close()
         gold, soldiers, armored, territories_count = res if res else (1500, 150, 5, 1)
         
-        await query.message.edit_text(
+        await safe_edit_or_reply(query,
             f"💰 **الخزينة الملكية والموارد العامة**\n\n"
             f"• رصيد الذهب: **{gold} قطعة ذهبية**\n"
             f"• جنود الجيش: **{soldiers} جندي**\n"
             f"• المدرعات الحربية: **{armored} مدرعة**\n"
             f"• المقاطعات المسيطر عليها: **{territories_count} مقاطعة**\n\n"
             f"تذكر: الترقية من المستوى 1 إلى 5 سهلة وسريعة، وبعد المستوى 5 تصبح التكلفة والصعوبة متوسطة لتحدي الأباطرة!",
-            reply_markup=InlineKeyboardMarkup([
+            InlineKeyboardMarkup([
                 [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
-            ]),
-            parse_mode="Markdown"
+            ])
         )
 
     elif data == "قائمة الهجوم":
@@ -392,7 +406,7 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             keyboard_buttons.append([InlineKeyboardButton(f"هجوم {t_name}", callback_data=f"هجوم {t_id}")])
 
         keyboard_buttons.append([InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")])
-        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard_buttons), parse_mode="Markdown")
+        await safe_edit_or_reply(query, text, InlineKeyboardMarkup(keyboard_buttons))
 
     elif data.startswith("هجوم "):
         target_t_id = int(data.split(" ")[1])
@@ -426,12 +440,11 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
                     cursor.execute("UPDATE empires SET shields = shields - 1 WHERE user_id = ?", (owner_id,))
                     conn.commit()
                     conn.close()
-                    await query.message.edit_text(
+                    await safe_edit_or_reply(query,
                         f"🛡️ **فشل الهجوم العسكري!**\n\n"
                         f"لقد هاجمت مقاطعة **{t_name}**، لكن إمبراطورية العدو كانت محمية بـ **درع دفاعي ملكي**!\n"
                         f"تم امتصاص ضربة الهجوم وتدمير درع واحد للعدو دون تغيير في سيطرة المقاطعة.",
-                        reply_markup=get_main_game_keyboard(),
-                        parse_mode="Markdown"
+                        get_main_game_keyboard()
                     )
                     return
                 defender_power = (def_soldiers * 1) + (def_armored * 50) + 150
@@ -449,13 +462,12 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             conn.commit()
             conn.close()
 
-            await query.message.edit_text(
+            await safe_edit_or_reply(query,
                 f"🎉 **انتصار ساحق ومجيد يا جلالة الإمبراطور!**\n\n"
                 f"قواتك الباسلة دكت حصون مقاطعة **{t_name}** وسحقت دفاعاتها!\n"
                 f"• تم ضم المقاطعة إلى حدود إمبراطوريتك.\n"
                 f"• تم غنم غنائم الحرب: **+ {loot} قطعة ذهبية** إلى خزينتك الملكية.",
-                reply_markup=get_main_game_keyboard(),
-                parse_mode="Markdown"
+                get_main_game_keyboard()
             )
         else:
             lost_soldiers = min(att_soldiers, random.randint(20, 50))
@@ -463,20 +475,32 @@ async def handle_game_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
             conn.commit()
             conn.close()
 
-            await query.message.edit_text(
+            await safe_edit_or_reply(query,
                 f"⚠️ **تصدى العدو لهجومك باقتدار!**\n\n"
                 f"فشلت القوات في اختراق تحصينات مقاطعة **{t_name}**.\n"
                 f"• خسائر المعركة: فقدان **{lost_soldiers} جندي** من صفوف الجيش.",
-                reply_markup=get_main_game_keyboard(),
-                parse_mode="Markdown"
+                get_main_game_keyboard()
             )
 
     elif data == "الرئيسية":
-        await query.message.edit_text(
+        await safe_edit_or_reply(query,
             "🏰 **لوحة تحكم الإمبراطورية الرئيسية:**",
-            reply_markup=get_main_game_keyboard(),
-            parse_mode="Markdown"
+            get_main_game_keyboard()
         )
+
+# دالة مساعدة لتحديث الرسائل النصية بأمان وتجنب مشاكل الصور أو النصوص الفارغة
+async def safe_edit_or_reply(query, text, reply_markup):
+    try:
+        if query.message.photo:
+            await query.message.delete()
+            await query.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+        else:
+            await query.message.edit_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    except Exception:
+        try:
+            await query.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+        except Exception:
+            pass
 
 async def handle_game_callbacks_refresh_shields(query, user_id):
     conn = sqlite3.connect(DB_PATH)
@@ -486,16 +510,15 @@ async def handle_game_callbacks_refresh_shields(query, user_id):
     conn.close()
     shields, gold = res if res else (5, 0)
     
-    await query.message.edit_text(
+    await safe_edit_or_reply(query,
         f"🛡️ **نظام دروع الحماية الملكية**\n\n"
         f"دروعك الحالية: **{shields} من 5 دروع**.\n"
         f"تكلفة شحن درع جديد: **200 قطعة ذهب**.\n\n"
         f"رصيدك الحالي: 💰 {gold} ذهبة",
-        reply_markup=InlineKeyboardMarkup([
+        InlineKeyboardMarkup([
             [InlineKeyboardButton("شراء درع جديد", callback_data="شراء درع")],
             [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
-        ]),
-        parse_mode="Markdown"
+        ])
     )
 
 async def handle_game_callbacks_refresh_recruitment(query, user_id):
@@ -506,15 +529,14 @@ async def handle_game_callbacks_refresh_recruitment(query, user_id):
     conn.close()
     soldiers, armored, gold = res if res else (150, 5, 0)
     
-    await query.message.edit_text(
+    await safe_edit_or_reply(query,
         f"⚔️ **ثكنة تجنيد الجيش والمدرعات الحربية**\n\n"
         f"• جنودك الحاليون: **{soldiers} جندي**\n"
         f"• مدرعاتك الحربية: **{armored} مدرعة**\n"
         f"• رصيد الذهب: 💰 {gold}",
-        reply_markup=InlineKeyboardMarkup([
+        InlineKeyboardMarkup([
             [InlineKeyboardButton("تجنيد جنود", callback_data="تجنيد جنود")],
             [InlineKeyboardButton("صنع مدرعة", callback_data="صنع مدرعة")],
             [InlineKeyboardButton("الرئيسية", callback_data="الرئيسية")]
-        ]),
-        parse_mode="Markdown"
+        ])
     )
