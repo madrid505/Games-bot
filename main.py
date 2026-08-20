@@ -23,7 +23,7 @@ from handlers.games_handler import handle_messages, callback_handler
 from royal_messages import GUESS_START_ANNOUNCEMENT
 from hunter import hunter_handler
 
-# استدعاء نظام حرب الإمبراطوريات الأسطورية الذي قمنا بتطويره
+# استدعاء نظام حرب الإمبراطوريات الأسطورية المحدث
 from empire_game import start_empire, handle_game_callbacks
 
 
@@ -182,11 +182,11 @@ def main():
     app.add_handler(CommandHandler("getid", get_id))
     app.add_handler(hunter_handler)
 
-    # --- تسجيل أوامر وأزرار إمبراطورية مونوبولي المحدثة ---
-    app.add_handler(CommandHandler("empire", start_empire))  # أمر لبدء الإمبراطورية
+    # --- تسجيل أوامر وأزرار إمبراطورية مونوبولي المحدثة (بالتعديلات المطلوبة) ---
+    app.add_handler(CommandHandler("امبراطورية", start_empire))  # تم التعديل ليصبح بدون همزة
     app.add_handler(CallbackQueryHandler(
         handle_game_callbacks, 
-        pattern="^(عرض_الخريطة|دروع_الدفاع|شراء_درع|التجنيد|تجنيد_جنود|صنع_مدرعة|المقاطعات|ترقية_|الخزينة|قائمة_الهجوم|هجوم_|الرئيسية)$"
+        pattern="^(عرض الخريطة|دروع الدفاع|شراء درع|التجنيد|تجنيد جنود|صنع مدرعة|المقاطعات|ترقية |الخزينة|قائمة الهجوم|هجوم |الرئيسية)$"
     ))
 
     # --- معالجة الرسائل العامة والأزرار الأخرى ---
