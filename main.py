@@ -1,26 +1,39 @@
+# app.py
+# الملف الرئيسي الشامل لإمبراطورية مونوبولي 2026 - نسخة متكاملة وأسطورية
+
 import os
-
-# فرض التوكن الجديد قسراً لتجاوز أي توكن قديم أو متغير بيئة معطل
-os.environ["8613134391:AAEymWFBRl2Yi_zLIe9e6Txpx3e-knqY4sQ"] = "الضع_هنا_التوكن_الجديد_الكامل_الذي_أنشأته_من_BotFather"
-
 import logging
 import random
 import asyncio
-from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, CommandHandler, filters, PicklePersistence, ContextTypes
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    MessageHandler,
+    CallbackQueryHandler,
+    CommandHandler,
+    filters,
+    PicklePersistence,
+    ContextTypes,
+    JobQueue
+)
+
+# استدعاء الإعدادات والرسائل والملفات الفرعية
 from config import BOT_TOKEN, OWNER_ID, GROUP_IDS
 from handlers.games_handler import handle_messages, callback_handler
-from telegram import Update
 from royal_messages import GUESS_START_ANNOUNCEMENT
 from hunter import hunter_handler
 
+# استدعاء نظام حرب الإمبراطوريات الأسطورية الذي قمنا بتطويره
+from empire_game import start_empire, handle_game_callbacks
 
-# إعداد السجلات
+
+# إعداد السجلات الملكية
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-# --- دالة التذكير الدوري (تُستدعى كل 15 ثانية) ---
+# --- دالة التذكير الدوري (تُستدعى كل 10 ثوانٍ) ---
 async def send_reminder_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     hint = job.data 
@@ -73,7 +86,6 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
 
-    u_id = update.effective_user.id
     text = update.message.text.strip() if update.message.text else ""
     chat_id = str(update.effective_chat.id)
 
@@ -113,7 +125,7 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode='Markdown'
                 )
                 
-                # 3. جدولة التذكير كل 15 ثانية
+                # 3. جدولة التذكير كل 10 ثوانٍ
                 context.job_queue.run_repeating(
                     send_reminder_job, 
                     interval=10, 
@@ -128,19 +140,19 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
             
 
-    # --- ثانياً: فحص القروبات ---
+    # --- ثانياً: فحص القروبات المسموحة فقط ---
     allowed_groups = [str(i).strip() for i in GROUP_IDS]
     
     if chat_id not in allowed_groups:
         return
 
-    # --- تم تمرير الرسالة ---
+    # --- تم تمرير الرسالة للألعاب ---
     if update.message.text or update.message.photo:
         await handle_messages(update, context)
 
 
 def main():
-    # --- تنظيف حالة الـ persistence ---
+    # --- تنظيف حالة الـ persistence لضمان الاستقرار ---
     persistence_path = "/app/data/games_data/games_persistence"
     if os.path.exists(persistence_path):
         try:
@@ -158,23 +170,30 @@ def main():
 
     persistence = PicklePersistence(filepath=os.path.join(games_dir, "games_persistence"))
 
-    
+    # بناء تطبيق البوت
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
     
     if app.job_queue is None:
-        from telegram.ext import JobQueue
         app.job_queue = JobQueue()
         app.job_queue.set_application(app)
 
-          
+    # --- تسجيل الأوامر الأساسية والألعاب ---
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("getid", get_id))
     app.add_handler(hunter_handler)
 
+    # --- تسجيل أوامر وأزرار إمبراطورية مونوبولي المحدثة ---
+    app.add_handler(CommandHandler("empire", start_empire))  # أمر لبدء الإمبراطورية
+    app.add_handler(CallbackQueryHandler(
+        handle_game_callbacks, 
+        pattern="^(عرض_الخريطة|دروع_الدفاع|شراء_درع|التجنيد|تجنيد_جنود|صنع_مدرعة|المقاطعات|ترقية_|الخزينة|قائمة_الهجوم|هجوم_|الرئيسية)$"
+    ))
+
+    # --- معالجة الرسائل العامة والأزرار الأخرى ---
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), catch_ids))
     app.add_handler(CallbackQueryHandler(callback_handler))
 
-    print("👑 إمبراطورية مونوبولي تعمل الآن مع نظام التخمين الدوري (10 ثانية)...")
+    print("👑 إمبراطورية مونوبولي تعمل الآن بكامل ميزاتها الاستراتيجية بنجاح!")
     app.run_polling(drop_pending_updates=True)
 
 
