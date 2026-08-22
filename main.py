@@ -26,6 +26,14 @@ from hunter import hunter_handler
 # استدعاء نظام حرب الإمبراطوريات الأسطورية المحدث
 from empire_game import start_empire, handle_game_callbacks
 
+# استدعاء ملف لعبة خمن الأكلة الإمبراطورية المحدث
+from food_game import (
+    start_food_game, 
+    show_scoreboard_command, 
+    handle_food_guess, 
+    scoreboard_callback
+)
+
 
 # إعداد السجلات الملكية
 logging.basicConfig(
@@ -146,7 +154,23 @@ async def catch_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_id not in allowed_groups:
         return
 
-    # --- تم تمرير الرسالة للألعاب ---
+    # --- ثالثاً: فحص لعبة خمن الأكلة (كلمة "خمن" لبدء اللعبة) ---
+    if text == "خمن":
+        await start_food_game(update, context)
+        return
+
+    # --- رابعاً: فحص دفتر نتائج الطهاة (كلمة "شيف") ---
+    if text == "شيف":
+        await show_scoreboard_command(update, context)
+        return
+
+    # --- خامساً: فحص الإجابة الحالية للعبة خمن الأكلة ---
+    # نقوم بتمرير الرسالة لمعالج فحص الإجابات أولاً
+    # (إذا كانت هناك جولة نشطة والرسالة إجابة صحيحة أو خاطئة، سيتعامل معها ملف food_game)
+    # ملاحظة: سنستدعي دالة فحص الإجابة هنا لضمان تفاعل البوت مع التخمينات الفورية في المجموعات
+    await handle_food_guess(update, context)
+
+    # --- سادساً: تم تمرير الرسالة للألعاب الأخرى (مونوبولي والخصائص السابقة) ---
     if update.message.text or update.message.photo:
         await handle_messages(update, context)
 
@@ -182,7 +206,7 @@ def main():
     app.add_handler(CommandHandler("getid", get_id))
     app.add_handler(hunter_handler)
 
-    # --- تسجيل أوامر وأزرار إمبراطورية مونوبولي المحدثة (بدون رموز وتستجيب للكلمة الصريحة والأزرار) ---
+    # --- تسجيل أوامر وأزرار إمبراطورية مونوبولي المحدثة ---
     app.add_handler(MessageHandler(filters.Regex("^امبراطورية$"), start_empire))
 
     app.add_handler(CallbackQueryHandler(
@@ -190,7 +214,8 @@ def main():
         pattern="^(عرض الخريطة|دروع الدفاع|شراء درع|التجنيد|تجنيد جنود|صنع مدرعة|المقاطعات|ترقية \d+|الخزينة|قائمة الهجوم|هجوم \d+|التحالفات|إنشاء_تحالف|مغادرة_تحالف|الرئيسية)$"
     ))
 
-
+    # --- تسجيل معالج أزرار التنقل (التالي والسابق) لدفتر نتائج لعبة الطبخ ---
+    app.add_handler(CallbackQueryHandler(scoreboard_callback, pattern="^food_page_"))
 
     # --- معالجة الرسائل العامة والأزرار الأخرى ---
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), catch_ids))
