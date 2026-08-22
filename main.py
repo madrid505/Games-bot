@@ -214,8 +214,8 @@ def main():
         pattern="^(عرض الخريطة|دروع الدفاع|شراء درع|التجنيد|تجنيد جنود|صنع مدرعة|المقاطعات|ترقية \d+|الخزينة|قائمة الهجوم|هجوم \d+|التحالفات|إنشاء_تحالف|مغادرة_تحالف|الرئيسية)$"
     ))
 
-    # --- تسجيل معالج أزرار التنقل (التالي والسابق) لدفتر نتائج لعبة الطبخ ---
-    app.add_handler(CallbackQueryHandler(scoreboard_callback, pattern="^food_page_"))
+    # --- تسجيل معالج أزرار لعبة الطبخ (دفتر النتائج وأزرار التنقل) ---
+    app.add_handler(CallbackQueryHandler(scoreboard_callback, pattern="^food_"))
 
     # --- معالجة الرسائل العامة والأزرار الأخرى ---
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), catch_ids))
